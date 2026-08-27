@@ -91,8 +91,11 @@ def get_user_by_id(user_id):
         return None
 
 def get_user_by_username(username):
-    doc = users_col.find_one({"username": username})
-    return convert_id(doc)
+    try:
+        return users_collection.find_one({'username': username})
+    except Exception as e:
+        print(f"Error in get_user_by_username: {e}")
+        return None
 
 def create_user(username, password, full_name, email=None, phone=None, role='user'):
     if users_col.find_one({"username": username}):
