@@ -1061,7 +1061,7 @@ def login():
         if user and user['password'] == password:
             session['logged_in'] = True
             session['username'] = username
-            session['user_id'] = user['id']
+            session['user_id'] = user['id']  # ← ខុស! MongoDB ប្រើ '_id'
             session['role'] = user['role']
             session['full_name'] = user['full_name']
             return redirect(url_for('dashboard'))
