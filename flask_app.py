@@ -1061,7 +1061,7 @@ def login():
         if user and user['password'] == password:
             session['logged_in'] = True
             session['username'] = username
-            session['user_id'] = str(user['_id'])  # ← កែ! ប្រើ '_id' ហើយប្តូរទៅជា string
+            session['user_id'] = str(user['_id'])  # ← កែត្រង់នេះ! (ប្រើ '_id')
             session['role'] = user['role']
             session['full_name'] = user['full_name']
             return redirect(url_for('dashboard'))
