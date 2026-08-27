@@ -300,31 +300,6 @@ def get_all_user_locks_route():
     locks = get_all_user_lock_status()
     return jsonify(locks)
 
-@app.route('/toggle_user_lock', methods=['POST'])
-def toggle_user_lock_route():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    data = request.get_json()
-    user_id = data.get('user_id')
-    lock_state = data.get('lock_state', 0)
-    auto_unlock_time = data.get('auto_unlock_time', '')
-    admin_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
-    if auto_unlock_time:
-        try:
-            datetime.strptime(auto_unlock_time, '%H:%M')
-        except ValueError:
-            return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM'})
-    if user_id == admin_id:
-        return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចបិទគណនីរបស់ខ្លួនឯងបានទេ!'})
-    result = toggle_user_lock(user_id, lock_state, auto_unlock_time if auto_unlock_time else None, admin_id)
-    if result:
-        user = get_user_by_id(user_id)
-        status = "បិទ" if lock_state == 1 else "បើក"
-        return jsonify({'success': True, 'message': f'✅ បាន{status}ការចូលធ្វើការរបស់ {user["full_name"]} ជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចប្តូរស្ថានភាពបាន!'})
-
 @app.route('/check_in', methods=['POST'])
 def check_in_route():
     try:
