@@ -420,12 +420,7 @@ def save_location():
 # USER MANAGEMENT ROUTES (បន្ថែមនៅទីនេះ)
 # ============================================================
 
-@app.route('/get_user/<user_id>')
-def get_user(user_id):
-    """Get user by ID for edit modal"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
+   
     user = get_user_by_id(user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
@@ -439,12 +434,7 @@ def get_user(user_id):
         'role': user.get('role')
     })
 
-@app.route('/update_user/<user_id>', methods=['POST'])
-def update_user_route(user_id):
-    """Update user information"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    
+   
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
@@ -489,25 +479,7 @@ def add_user_route():
         return jsonify({'success': True, 'message': f'✅ បានបន្ថែមអ្នកប្រើ "{username}" ជោគជ័យ!'})
     return jsonify({'success': False, 'message': f'❌ ឈ្មោះអ្នកប្រើ "{username}" មានរួចហើយ!'})
 
-@app.route('/delete_user/<user_id>', methods=['POST'])
-def delete_user_route(user_id):
-    """Delete user"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    
-    if str(user_id) == str(session.get('user_id')):
-        return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចលុបគណនីរបស់ខ្លួនឯងបានទេ!'})
-    
-    if delete_user(user_id):
-        return jsonify({'success': True, 'message': '✅ លុបអ្នកប្រើជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចលុបបាន!'})
-
-@app.route('/admin_reset_password/<user_id>', methods=['POST'])
-def admin_reset_password(user_id):
-    """Admin reset user password"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    
+   
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
@@ -519,17 +491,6 @@ def admin_reset_password(user_id):
     if update_password(user_id, new_password):
         return jsonify({'success': True, 'message': '✅ បានកំណត់ពាក្យសម្ងាត់ថ្មីជោគជ័យ!'})
     return jsonify({'success': False, 'message': '❌ មិនអាចកំណត់ពាក្យសម្ងាត់បាន!'})
-
-@app.route('/get_attendance_setting/<user_id>')
-def get_attendance_setting_route(user_id):
-    """Get attendance setting for user"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    setting = get_attendance_setting(user_id)
-    if setting:
-        return jsonify(setting)
-    return jsonify({'user_id': user_id, 'check_in_deadline': '', 'is_active': 0})
 
 @app.route('/save_attendance_setting', methods=['POST'])
 def save_attendance_setting_route():
@@ -643,31 +604,6 @@ def manage_users():
                                    user_locks=user_locks_dict,
                                    message='',
                                    message_type='')
-@app.route('/get_user/<int:user_id>')
-def get_user(user_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    user = get_user_by_id(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    # MongoDB uses '_id' not 'id'
-    return jsonify({
-        'id': str(user['_id']),  # ← ត្រូវប្រាកដថាប្រើ '_id'
-        'username': user['username'],
-        'full_name': user['full_name'],
-        'email': user.get('email') or '',
-        'phone': user.get('phone') or '',
-        'role': user.get('role')
-    })
-
-@app.route('/get_attendance_setting/<int:user_id>')
-def get_attendance_setting_route(user_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    setting = get_attendance_setting(user_id)
-    if setting:
-        return jsonify(setting)
-    return jsonify({'user_id': user_id, 'check_in_deadline': '', 'is_active': 0})
 
 @app.route('/save_attendance_setting', methods=['POST'])
 def save_attendance_setting_route():
@@ -689,16 +625,6 @@ def save_attendance_setting_route():
         return jsonify({'success': True, 'message': '✅ រក្សាទុកការកំណត់ជោគជ័យ!'})
     return jsonify({'success': False, 'message': '❌ មិនអាចរក្សាទុកបាន!'})
 
-@app.route('/update_user/<int:user_id>', methods=['POST'])
-def update_user_route(user_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    data = request.get_json()
-    result = update_user(user_id, data.get('username'), data.get('full_name'), data.get('email'), data.get('phone'), data.get('role'))
-    if result:
-        return jsonify({'success': True, 'message': '✅ កែប្រែអ្នកប្រើជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចកែប្រែបាន!'})
-
 @app.route('/add_user', methods=['POST'])
 def add_user_route():
     if not session.get('logged_in') or session.get('role') != 'admin':
@@ -707,16 +633,6 @@ def add_user_route():
     if create_user(data.get('username'), data.get('password'), data.get('full_name'), data.get('email'), data.get('phone'), data.get('role')):
         return jsonify({'success': True, 'message': f'✅ បានបន្ថែមអ្នកប្រើ "{data.get("username")}" ជោគជ័យ!'})
     return jsonify({'success': False, 'message': '❌ ឈ្មោះអ្នកប្រើមានរួចហើយ!'})
-
-@app.route('/delete_user/<int:user_id>', methods=['POST'])
-def delete_user_route(user_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    if user_id == session.get('user_id'):
-        return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចលុបគណនីរបស់ខ្លួនឯងបានទេ!'})
-    if delete_user(user_id):
-        return jsonify({'success': True, 'message': '✅ លុបអ្នកប្រើជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចលុបបាន!'})
 
 @app.route('/change_password', methods=['GET', 'POST'])
 def change_password():
@@ -749,18 +665,6 @@ def change_password():
                 message = '❌ មិនអាចប្តូរពាក្យសម្ងាត់បាន!'
                 message_type = 'error'
     return render_template_string(CHANGE_PASSWORD_HTML, session=session, message=message, message_type=message_type)
-
-@app.route('/admin_reset_password/<int:user_id>', methods=['POST'])
-def admin_reset_password(user_id):
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    data = request.get_json()
-    new_password = data.get('new_password')
-    if not new_password or len(new_password) < 4:
-        return jsonify({'success': False, 'message': 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!'})
-    if update_password(user_id, new_password):
-        return jsonify({'success': True, 'message': '✅ បានកំណត់ពាក្យសម្ងាត់ថ្មីជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចកំណត់ពាក្យសម្ងាត់បាន!'})
 
 @app.route('/clean_data', methods=['POST'])
 def clean_data():
