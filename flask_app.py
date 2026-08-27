@@ -1445,32 +1445,32 @@ DASHBOARD_HTML = r'''
     body { 
         font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; 
         background: #f0f2f5; 
-        padding: 0; 
+        padding: 15; 
         margin: 0; 
         min-height: 100vh; 
         width: 100%;
         overflow-x: hidden;
     }
     .container { 
-        max-width: 100%; 
-        margin: 0; 
-        padding: 0;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 10px;
         width: 100%;
     }
     .header {
-        background: linear-gradient(135deg, #1a73e8, #0d47a1);
-        color: white;
-        padding: 12px 25px;
-        border-radius: 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        gap: 10px;
-        width: 100%;
-    }
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: white;
+    padding: 12px 25px;
+    border-radius: 12px;  /* ← បន្ថែម border-radius វិញ */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+}
     .header-left h2 { font-size: 18px; font-weight: 600; white-space: nowrap; }
     .header-right {
         display: flex;
@@ -1531,7 +1531,7 @@ DASHBOARD_HTML = r'''
         grid-template-columns: repeat(4, 1fr);
         gap: 15px;
         margin-bottom: 20px;
-        padding: 0 15px;
+        padding: 0;
     }
     .stat-card {
         background: white;
@@ -1553,7 +1553,7 @@ DASHBOARD_HTML = r'''
         grid-template-columns: 1fr 1fr;
         gap: 12px;
         margin-bottom: 20px;
-        padding: 0 15px;
+        padding: 0;
     }
     .action-buttons .btn {
         padding: 14px 10px;
@@ -1588,7 +1588,7 @@ DASHBOARD_HTML = r'''
         padding: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         overflow-x: auto;
-        margin: 0 15px 20px 15px;
+        margin: 0 0 20px 0;
     }
     .table-container .table-title {
         font-size: 18px;
@@ -1758,7 +1758,7 @@ DASHBOARD_HTML = r'''
         margin-bottom: 10px;
         font-size: 14px;
         display: none;
-        margin: 0 15px 10px 15px;
+        margin: 0 0 10px 0;
     }
     .status-message.info {
         background: #d1ecf1;
@@ -1790,7 +1790,7 @@ DASHBOARD_HTML = r'''
         border: 2px solid #dc3545;
         display: block;
         font-weight: 600;
-        margin: 0 15px 10px 15px;
+        margin: 0 0 10px 0;
     }
     .install-btn {
         background: #34a853;
@@ -1816,7 +1816,7 @@ DASHBOARD_HTML = r'''
         grid-template-columns: 1fr 1fr;
         gap: 15px;
         margin-top: 15px;
-        padding: 0 15px;
+        padding: 0;
     }
     .summary-card {
         background: white;
@@ -1866,18 +1866,18 @@ DASHBOARD_HTML = r'''
     }
     .user-lock-badge.unlocked { background: #4caf50; }
     .lock-banner {
-        background: linear-gradient(135deg, #dc3545, #b02a37);
-        color: white;
-        padding: 12px 25px;
-        border-radius: 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        gap: 10px;
-        width: 100%;
-    }
+    background: linear-gradient(135deg, #dc3545, #b02a37);
+    color: white;
+    padding: 12px 25px;
+    border-radius: 12px;  /* ← បន្ថែម border-radius */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+}
     .lock-banner .lock-icon { font-size: 24px; margin-right: 10px; }
     .lock-banner .lock-text { font-size: 16px; font-weight: 500; flex: 1; }
     .lock-banner .lock-time { font-size: 13px; opacity: 0.8; }
@@ -1895,18 +1895,18 @@ DASHBOARD_HTML = r'''
     .lock-banner .lock-btn:hover { background: rgba(255,255,255,0.35); }
     .lock-banner.unlocked { background: linear-gradient(135deg, #34a853, #1e7e34); }
     .user-lock-banner {
-        background: linear-gradient(135deg, #ff9800, #e65100);
-        color: white;
-        padding: 10px 25px;
-        border-radius: 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        gap: 8px;
-        width: 100%;
-    }
+    background: linear-gradient(135deg, #ff9800, #e65100);
+    color: white;
+    padding: 10px 25px;
+    border-radius: 12px;  /* ← បន្ថែម border-radius */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
     .user-lock-banner.show { display: flex; }
     .user-lock-banner .lock-icon { font-size: 20px; margin-right: 8px; }
     .user-lock-banner .lock-text { font-size: 14px; font-weight: 500; flex: 1; }
