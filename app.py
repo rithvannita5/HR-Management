@@ -9,44 +9,25 @@ from datetime import datetime, timedelta
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-import threading
-import time
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here-change-it-to-something-secure-123456789'
 
-# ============================================================
-# TIME & UTILITY FUNCTIONS (ត្រូវដាក់ពីលើគេបង្អស់)
-# ============================================================
-
-def get_current_date():
-    tz = pytz.timezone('Asia/Phnom_Penh')
-    return datetime.now(tz).strftime('%Y-%m-%d')
-
-def get_current_datetime():
-    tz = pytz.timezone('Asia/Phnom_Penh')
-    return datetime.now(tz)
-
-def get_current_time():
-    tz = pytz.timezone('Asia/Phnom_Penh')
-    return datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
-
-def get_current_time_only():
-    tz = pytz.timezone('Asia/Phnom_Penh')
-    return datetime.now(tz).strftime('%H:%M:%S')
+import threading
+import time
 
 # ============================================================
-# BACKGROUND AUTO-LOCK/UNLOCK THREAD
+# BACKGROUND AUTO-UNLOCK THREAD
 # ============================================================
 
-def auto_lock_unlock_checker():
-    """Background thread to automatically lock/unlock users based on deadlines"""
+def auto_unlock_checker():
+    """Background thread to automatically unlock system and users at scheduled times"""
     while True:
         try:
             current_time = get_current_time_only()  # HH:MM:SS
             current_hhmm = current_time[:5]  # HH:MM
 
-            # ===== Check System Lock (Auto-unlock) =====
+            # ===== Check System Lock =====
             lock = get_system_lock_status()
             if lock.get('is_locked', 0) == 1:
                 auto_unlock = lock.get('auto_unlock_time')
@@ -56,32 +37,7 @@ def auto_lock_unlock_checker():
                     increment_data_version()
                     print("✅ System auto-unlocked successfully!")
 
-            # ===== Auto-lock users based on attendance deadline =====
-            conn = get_db_connection()
-            active_settings = conn.execute('''
-                SELECT user_id, check_in_deadline
-                FROM attendance_settings
-                WHERE is_active = 1
-                AND check_in_deadline IS NOT NULL
-                AND check_in_deadline != ''
-            ''').fetchall()
-            conn.close()
-
-            for setting in active_settings:
-                user_id = setting['user_id']
-                deadline = setting['check_in_deadline']
-                
-                if deadline and current_hhmm >= deadline:
-                    user_lock = get_user_lock_status(user_id)
-                    if user_lock.get('is_locked', 0) != 1:
-                        print(f"🔒 Auto-locking user {user_id} at {current_hhmm} (deadline: {deadline})")
-                        system_lock = get_system_lock_status()
-                        auto_unlock = system_lock.get('auto_unlock_time', '06:00')
-                        update_user_lock(user_id, 1, auto_unlock_time=auto_unlock)
-                        increment_data_version()
-                        print(f"✅ User {user_id} auto-locked successfully!")
-
-            # ===== Auto-unlock users based on auto_unlock_time =====
+            # ===== Check User Locks =====
             conn = get_db_connection()
             locked_users = conn.execute('''
                 SELECT user_id, auto_unlock_time
@@ -102,25 +58,32 @@ def auto_lock_unlock_checker():
                     print(f"✅ User {user_id} auto-unlocked successfully!")
 
         except Exception as e:
-            print(f"❌ Error in auto-lock/unlock checker: {e}")
+            print(f"❌ Error in auto-unlock checker: {e}")
 
+        # Check every 30 seconds
         time.sleep(30)
 
-def start_auto_lock_unlock_thread():
-    thread = threading.Thread(target=auto_lock_unlock_checker, daemon=True)
+# Start the background thread
+def start_auto_unlock_thread():
+    thread = threading.Thread(target=auto_unlock_checker, daemon=True)
     thread.start()
-    print("✅ Auto-lock/unlock background thread started!")
+    print("✅ Auto-unlock background thread started!")
 
-start_auto_lock_unlock_thread()
+# Start the thread when the app starts
+start_auto_unlock_thread()
 
 # ===== UPLOAD CONFIGURATION =====
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
-app.config['ALLOWED_DISTANCE'] = 150
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+app.config['ALLOWED_DISTANCE'] = 150  # 150 meters
 
 UPLOAD_FOLDER_LEAVES = os.path.join('static', 'uploads', 'leaves')
 UPLOAD_FOLDER_MISSIONS = os.path.join('static', 'uploads', 'missions')
 os.makedirs(UPLOAD_FOLDER_LEAVES, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_MISSIONS, exist_ok=True)
+
+# ============================================================
+# DATABASE CONFIGURATION
+# ============================================================
 
 DB_NAME = 'employees.db'
 
@@ -128,6 +91,22 @@ def get_db_connection():
     conn = sqlite3.connect(DB_NAME, timeout=20)
     conn.row_factory = sqlite3.Row
     return conn
+
+def get_current_date():
+    tz = pytz.timezone('Asia/Phnom_Penh')
+    return datetime.now(tz).strftime('%Y-%m-%d')
+
+def get_current_datetime():
+    tz = pytz.timezone('Asia/Phnom_Penh')
+    return datetime.now(tz)
+
+def get_current_time():
+    tz = pytz.timezone('Asia/Phnom_Penh')
+    return datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
+def get_current_time_only():
+    tz = pytz.timezone('Asia/Phnom_Penh')
+    return datetime.now(tz).strftime('%H:%M:%S')
 
 def table_exists(table_name):
     conn = get_db_connection()
@@ -151,6 +130,7 @@ def column_exists(table_name, column_name):
 def migrate_database():
     conn = get_db_connection()
 
+    # Create attendance_settings table if not exists
     if not table_exists('attendance_settings'):
         conn.execute('''
             CREATE TABLE IF NOT EXISTS attendance_settings (
@@ -166,6 +146,7 @@ def migrate_database():
         conn.commit()
         print("✅ Created table attendance_settings")
 
+    # Add columns to attendance_settings if needed
     if table_exists('attendance_settings'):
         if not column_exists('attendance_settings', 'check_in_deadline'):
             try:
@@ -181,6 +162,7 @@ def migrate_database():
             except sqlite3.OperationalError as e:
                 print(f"⚠️ Could not add is_active: {e}")
 
+    # ===== NEW: User lock table =====
     if not table_exists('user_attendance_lock'):
         conn.execute('''
             CREATE TABLE IF NOT EXISTS user_attendance_lock (
@@ -199,6 +181,7 @@ def migrate_database():
         conn.commit()
         print("✅ Created table user_attendance_lock")
 
+    # ===== System-wide attendance lock table =====
     if not table_exists('system_attendance_lock'):
         conn.execute('''
             CREATE TABLE IF NOT EXISTS system_attendance_lock (
@@ -215,6 +198,7 @@ def migrate_database():
         conn.commit()
         print("✅ Created table system_attendance_lock")
 
+        # Insert default record
         conn.execute('''
             INSERT INTO system_attendance_lock (is_locked, auto_unlock_time)
             VALUES (0, '06:00')
@@ -388,6 +372,7 @@ def init_db():
         )
     ''')
 
+    # Attendance Settings Table
     conn.execute('''
         CREATE TABLE IF NOT EXISTS attendance_settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -400,6 +385,7 @@ def init_db():
         )
     ''')
 
+    # System Attendance Lock Table
     conn.execute('''
         CREATE TABLE IF NOT EXISTS system_attendance_lock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -413,6 +399,7 @@ def init_db():
         )
     ''')
 
+    # User Attendance Lock Table
     conn.execute('''
         CREATE TABLE IF NOT EXISTS user_attendance_lock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -448,6 +435,7 @@ def init_db():
     if not version:
         conn.execute("INSERT INTO data_version (version) VALUES (1)")
 
+    # Insert default system lock if not exists
     lock = conn.execute("SELECT * FROM system_attendance_lock LIMIT 1").fetchone()
     if not lock:
         conn.execute('''
@@ -467,6 +455,7 @@ def init_db():
 # ============================================================
 
 def get_system_lock_status():
+    """Get current system lock status"""
     try:
         conn = get_db_connection()
         result = conn.execute("SELECT * FROM system_attendance_lock ORDER BY id DESC LIMIT 1").fetchone()
@@ -477,6 +466,7 @@ def get_system_lock_status():
         return {'is_locked': 0, 'auto_unlock_time': '06:00'}
 
 def update_system_lock(is_locked, lock_start_time=None, lock_end_time=None, auto_unlock_time=None, locked_by=None):
+    """Update system lock status"""
     try:
         conn = get_db_connection()
         current = conn.execute("SELECT * FROM system_attendance_lock ORDER BY id DESC LIMIT 1").fetchone()
@@ -508,35 +498,44 @@ def update_system_lock(is_locked, lock_start_time=None, lock_end_time=None, auto
         return False
 
 def check_system_lock_for_user(user_id):
+    """
+    Check if system allows attendance for a user
+    Returns: (allowed, message)
+    """
     lock = get_system_lock_status()
 
+    # If not locked, allow
     if lock.get('is_locked', 0) != 1:
         return True, None
 
+    # Check if there's an auto-unlock time set
     auto_unlock = lock.get('auto_unlock_time')
     if auto_unlock:
         current_time = get_current_time_only()
         current_hhmm = current_time[:5]
+        # If current time >= auto_unlock time, automatically unlock
         if current_hhmm >= auto_unlock:
             print(f"🔄 Auto-unlocking system during check (current: {current_hhmm}, scheduled: {auto_unlock})")
             update_system_lock(0, locked_by=None)
             increment_data_version()
             return True, None
 
+    # System is locked
     return False, "⛔ ប្រព័ន្ធកំពុងបិទការចូលធ្វើការ! សូមរង់ចាំរហូតដល់ម៉ោងបើកដោយស្វ័យប្រវត្តិ ឬទាក់ទង Admin!"
 
 def toggle_system_lock(lock_state, auto_unlock_time=None, locked_by=None):
+    """Toggle system lock on/off"""
     lock = get_system_lock_status()
     current_time = get_current_time()
 
-    if lock_state == 1:
+    if lock_state == 1:  # Locking
         return update_system_lock(
             is_locked=1,
             lock_start_time=current_time,
             auto_unlock_time=auto_unlock_time or lock.get('auto_unlock_time', '06:00'),
             locked_by=locked_by
         )
-    else:
+    else:  # Unlocking
         return update_system_lock(
             is_locked=0,
             lock_end_time=current_time,
@@ -544,10 +543,11 @@ def toggle_system_lock(lock_state, auto_unlock_time=None, locked_by=None):
         )
 
 # ============================================================
-# USER ATTENDANCE LOCK FUNCTIONS
+# USER ATTENDANCE LOCK FUNCTIONS (NEW)
 # ============================================================
 
 def get_user_lock_status(user_id):
+    """Get lock status for a specific user"""
     try:
         conn = get_db_connection()
         result = conn.execute(
@@ -561,6 +561,7 @@ def get_user_lock_status(user_id):
         return {'is_locked': 0, 'auto_unlock_time': None}
 
 def update_user_lock(user_id, is_locked, auto_unlock_time=None, locked_by=None):
+    """Update lock status for a specific user"""
     try:
         conn = get_db_connection()
         current_time = get_current_time()
@@ -605,24 +606,33 @@ def update_user_lock(user_id, is_locked, auto_unlock_time=None, locked_by=None):
         return False
 
 def check_user_lock(user_id):
+    """
+    Check if a specific user is locked
+    Returns: (allowed, message)
+    """
     lock = get_user_lock_status(user_id)
 
+    # If not locked, allow
     if lock.get('is_locked', 0) != 1:
         return True, None
 
+    # Check if there's an auto-unlock time set
     auto_unlock = lock.get('auto_unlock_time')
     if auto_unlock:
         current_time = get_current_time_only()
         current_hhmm = current_time[:5]
+        # If current time >= auto_unlock time, automatically unlock
         if current_hhmm >= auto_unlock:
             print(f"🔄 Auto-unlocking user {user_id} during check (current: {current_hhmm}, scheduled: {auto_unlock})")
             update_user_lock(user_id, 0)
             increment_data_version()
             return True, None
 
+    # User is locked
     return False, "⛔ អ្នកត្រូវបានបិទការចូលធ្វើការដោយ Admin! សូមទាក់ទង Admin!"
 
 def get_all_user_lock_status():
+    """Get lock status for all users"""
     try:
         conn = get_db_connection()
         results = conn.execute('''
@@ -640,9 +650,10 @@ def get_all_user_lock_status():
         return []
 
 def toggle_user_lock(user_id, lock_state, auto_unlock_time=None, locked_by=None):
-    if lock_state == 1:
+    """Toggle lock for a specific user"""
+    if lock_state == 1:  # Locking
         return update_user_lock(user_id, 1, auto_unlock_time, locked_by)
-    else:
+    else:  # Unlocking
         return update_user_lock(user_id, 0, locked_by=locked_by)
 
 # ============================================================
@@ -802,18 +813,20 @@ def save_attendance_setting(user_id, check_in_deadline, is_active):
     return True
 
 def check_attendance_deadline(user_id):
+    """ពិនិត្យថាតើអ្នកប្រើអាចចូលធ្វើការបានឬទេ តាមម៉ោងកំណត់"""
     setting = get_attendance_setting(user_id)
     if not setting:
-        return True, None
+        return True, None  # មិនមានការកំណត់
 
     if setting.get('is_active') != 1:
-        return True, None
+        return True, None  # មិនទាន់បើកការកំណត់
 
     deadline = setting.get('check_in_deadline')
     if not deadline:
         return True, None
 
-    current_time = get_current_time_only()
+    current_time = get_current_time_only()  # HH:MM:SS
+    # ប្រៀបធៀបតែម៉ោង និងនាទី
     current_hhmm = current_time[:5]
 
     if current_hhmm > deadline:
@@ -843,6 +856,7 @@ def check_in(user_id, lat, lng, distance, shift):
     check_in_time = get_current_time()
     conn = get_db_connection()
 
+    # ពិនិត្យថាមាន record ដែលមិនទាន់បិទឬទេ
     existing = conn.execute(
         """SELECT id FROM attendance
            WHERE user_id = ?
@@ -854,6 +868,7 @@ def check_in(user_id, lat, lng, distance, shift):
         conn.close()
         return False, "អ្នកបានចូលធ្វើការរួចហើយ! សូមចុច 'ចេញពីធ្វើការ' មុនពេលចូលម្តងទៀត!"
 
+    # ===== ពិនិត្យម៉ោងកំណត់ =====
     can_checkin, deadline = check_attendance_deadline(user_id)
     if not can_checkin:
         return False, f"⛔ អ្នកលើសម៉ោងដែល Admin បានកំណត់ (ម៉ោងកំណត់: {deadline})! សូមទាក់ទងទៅអ្នកគ្រប់គ្រង!"
@@ -873,6 +888,7 @@ def check_out(user_id, lat, lng, distance):
     check_out_time = get_current_datetime()
     conn = get_db_connection()
 
+    # ស្វែងរក record ដែលមិនទាន់បិទ
     record = conn.execute(
         """SELECT id, check_in, shift, date
            FROM attendance
@@ -886,16 +902,19 @@ def check_out(user_id, lat, lng, distance):
         conn.close()
         return False, "មិនមានការចូលធ្វើការដែលមិនទាន់ចេញ!"
 
+    # Parse check_in time
     check_in_time = datetime.strptime(record['check_in'], '%Y-%m-%d %H:%M:%S')
     tz = pytz.timezone('Asia/Phnom_Penh')
     check_in_time = tz.localize(check_in_time)
 
+    # ===== គណនាម៉ោងដោយមិនចាប់វគ្គ =====
     if check_out_time <= check_in_time:
         check_out_time = check_out_time + timedelta(days=1)
 
     diff = check_out_time - check_in_time
     total_hours = diff.total_seconds() / 3600
 
+    # Update attendance
     conn.execute(
         """UPDATE attendance
            SET check_out = ?, total_hours = ?, check_out_lat = ?, check_out_lng = ?, check_out_distance = ?
@@ -1737,7 +1756,10 @@ def dashboard():
     current_year = today.strftime('%Y')
     allowed_distance = app.config['ALLOWED_DISTANCE']
 
+    # Get system lock status
     lock_status = get_system_lock_status()
+
+    # Get user lock status for current user
     user_lock = get_user_lock_status(session.get('user_id'))
 
     return render_template_string(DASHBOARD_HTML,
@@ -1798,7 +1820,7 @@ def toggle_system_lock_route():
     return jsonify({'success': False, 'message': '❌ មិនអាចប្តូរស្ថានភាពបាន!'})
 
 # ============================================================
-# USER LOCK ROUTES
+# USER LOCK ROUTES (NEW)
 # ============================================================
 
 @app.route('/get_user_lock/<int:user_id>')
@@ -1829,12 +1851,14 @@ def toggle_user_lock_route():
     if not user_id:
         return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
 
+    # Validate time format if provided
     if auto_unlock_time:
         try:
             datetime.strptime(auto_unlock_time, '%H:%M')
         except ValueError:
             return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM'})
 
+    # Don't allow admin to lock themselves
     if user_id == admin_id:
         return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចបិទគណនីរបស់ខ្លួនឯងបានទេ!'})
 
@@ -1871,21 +1895,15 @@ def check_in_route():
         if company_lat is None or company_lng is None:
             return jsonify({'success': False, 'message': 'សូមឲ្យ Admin កំណត់ទីតាំងក្រុមហ៊ុនជាមុនសិន!'})
 
+        # ===== Check system lock =====
         allowed, lock_message = check_system_lock_for_user(user_id)
         if not allowed:
             return jsonify({'success': False, 'message': lock_message})
 
+        # ===== Check user lock =====
         allowed, user_lock_message = check_user_lock(user_id)
         if not allowed:
             return jsonify({'success': False, 'message': user_lock_message})
-
-        can_checkin, deadline = check_attendance_deadline(user_id)
-        if not can_checkin:
-            system_lock = get_system_lock_status()
-            auto_unlock = system_lock.get('auto_unlock_time', '06:00')
-            update_user_lock(user_id, 1, auto_unlock_time=auto_unlock)
-            increment_data_version()
-            return jsonify({'success': False, 'message': f'⛔ អ្នកលើសម៉ោងដែល Admin បានកំណត់ (ម៉ោងកំណត់: {deadline})! ប្រព័ន្ធបានបិទការចូលធ្វើការរបស់អ្នកដោយស្វ័យប្រវត្តិ!'})
 
         distance = haversine_distance(user_lat, user_lng, company_lat, company_lng)
         allowed_distance = app.config['ALLOWED_DISTANCE']
@@ -1941,10 +1959,12 @@ def check_out_route():
         if company_lat is None or company_lng is None:
             return jsonify({'success': False, 'message': 'សូមឲ្យ Admin កំណត់ទីតាំងក្រុមហ៊ុនជាមុនសិន!'})
 
+        # ===== Check system lock =====
         allowed, lock_message = check_system_lock_for_user(user_id)
         if not allowed:
             return jsonify({'success': False, 'message': lock_message})
 
+        # ===== Check user lock =====
         allowed, user_lock_message = check_user_lock(user_id)
         if not allowed:
             return jsonify({'success': False, 'message': user_lock_message})
@@ -2534,6 +2554,7 @@ def export_excel():
 
 @app.route('/check_auto_unlock')
 def check_auto_unlock():
+    """Check if any auto-unlock should happen now"""
     if not session.get('logged_in') or session.get('role') != 'admin':
         return jsonify({'success': False, 'message': 'Unauthorized'})
 
@@ -2541,6 +2562,7 @@ def check_auto_unlock():
         current_time = get_current_time_only()[:5]
         unlocked_items = []
 
+        # Check system lock
         lock = get_system_lock_status()
         if lock.get('is_locked', 0) == 1:
             auto_unlock = lock.get('auto_unlock_time')
@@ -2549,6 +2571,7 @@ def check_auto_unlock():
                 unlocked_items.append('system')
                 print(f"✅ System auto-unlocked via API at {current_time}")
 
+        # Check user locks
         conn = get_db_connection()
         locked_users = conn.execute('''
             SELECT user_id, auto_unlock_time
@@ -2668,6 +2691,8 @@ self.addEventListener('fetch', function(e) {
     );
 });
     ''', 200, {'Content-Type': 'application/javascript'}
+
+from flask import send_from_directory
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -2951,6 +2976,91 @@ def login():
             color: #ccc;
             font-size: 12px;
         }
+        @media (max-width: 600px) {
+            .login-box {
+                padding: 30px 22px;
+                border-radius: 18px;
+                max-height: none;
+            }
+            .login-box h2 {
+                font-size: 26px;
+            }
+            .login-box input {
+                padding: 15px 16px;
+                font-size: 16px;
+            }
+            .login-box button {
+                padding: 15px;
+                font-size: 17px;
+            }
+            .logo-icon {
+                font-size: 55px;
+            }
+        }
+        @media (max-width: 400px) {
+            .login-container {
+                padding: 10px;
+            }
+            .login-box {
+                padding: 22px 16px;
+                border-radius: 14px;
+            }
+            .login-box h2 {
+                font-size: 22px;
+            }
+            .login-box input {
+                padding: 13px 14px;
+                font-size: 15px;
+            }
+            .login-box button {
+                padding: 13px;
+                font-size: 16px;
+            }
+            .logo-icon {
+                font-size: 45px;
+            }
+            .login-box .sub-title {
+                font-size: 13px;
+                margin-bottom: 20px;
+            }
+        }
+        @media (max-height: 600px) {
+            .login-box {
+                padding: 20px 20px;
+            }
+            .logo-icon {
+                font-size: 40px;
+                margin-bottom: 4px;
+            }
+            .login-box h2 {
+                font-size: 22px;
+                margin-bottom: 2px;
+            }
+            .login-box .sub-title {
+                font-size: 13px;
+                margin-bottom: 16px;
+            }
+            .login-box .form-group {
+                margin-bottom: 10px;
+            }
+            .login-box input {
+                padding: 12px 14px;
+                font-size: 15px;
+            }
+            .login-box button {
+                padding: 12px;
+                font-size: 16px;
+            }
+            .login-box .hint {
+                margin-top: 10px;
+                font-size: 12px;
+            }
+            .login-box .footer-text {
+                margin-top: 12px;
+                padding-top: 10px;
+                font-size: 11px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2973,6 +3083,81 @@ def login():
             <div class="footer-text">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</div>
         </div>
     </div>
+    <script>
+        let deferredPrompt;
+        const installBtn = document.createElement('button');
+        installBtn.id = 'pwaInstallBtn';
+        installBtn.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #34a853;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 30px;
+            font-size: 16px;
+            font-family: 'Khmer OS', Arial, sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(52, 168, 83, 0.4);
+            z-index: 9999;
+            display: none;
+            animation: slideUp 0.5s ease;
+        `;
+        installBtn.innerHTML = '📲 ដំឡើងកម្មវិធី';
+        document.body.appendChild(installBtn);
+
+        const stylePwa = document.createElement('style');
+        stylePwa.textContent = `
+            @keyframes slideUp {
+                from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+                to { transform: translateX(-50%) translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(stylePwa);
+
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', function() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function(choiceResult) {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                        installBtn.style.display = 'none';
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        });
+
+        window.addEventListener('appinstalled', function() {
+            console.log('App installed successfully!');
+            installBtn.style.display = 'none';
+        });
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+            .then(function(reg) {
+                console.log('Service Worker registered successfully!');
+            })
+            .catch(function(err) {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            installBtn.style.display = 'none';
+        }
+    </script>
 </body>
 </html>
 '''
@@ -2981,6 +3166,10 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+# ============================================================
+# DASHBOARD_HTML - Updated with user lock feature
+# ============================================================
 
 DASHBOARD_HTML = r'''
 <!DOCTYPE html>
@@ -3409,6 +3598,7 @@ DASHBOARD_HTML = r'''
         .deadline-badge.inactive {
             background: #9e9e9e;
         }
+        /* User Lock Badge */
         .user-lock-badge {
             display: inline-block;
             padding: 2px 10px;
@@ -3421,6 +3611,7 @@ DASHBOARD_HTML = r'''
         .user-lock-badge.unlocked {
             background: #4caf50;
         }
+        /* System Lock Banner */
         .lock-banner {
             background: linear-gradient(135deg, #dc3545, #b02a37);
             color: white;
@@ -3461,6 +3652,7 @@ DASHBOARD_HTML = r'''
         .lock-banner.unlocked {
             background: linear-gradient(135deg, #34a853, #1e7e34);
         }
+        /* User Lock Banner */
         .user-lock-banner {
             background: linear-gradient(135deg, #ff9800, #e65100);
             color: white;
@@ -3483,6 +3675,43 @@ DASHBOARD_HTML = r'''
         .user-lock-banner .lock-time {
             font-size: 12px;
             opacity: 0.8;
+        }
+        @media (max-width: 900px) {
+            .header { flex-direction: column; align-items: center; gap: 12px; padding: 15px; }
+            .header-left h2 { font-size: 16px; text-align: center; }
+            .header-right { justify-content: center; }
+            .header-right .nav-btn { font-size: 12px; padding: 5px 12px; }
+            .header-right .user-name-btn { font-size: 12px; padding: 5px 12px; }
+            .header-right .logout-link { font-size: 12px; padding: 5px 12px; }
+        }
+        @media (max-width: 768px) {
+            .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stat-card .number { font-size: 24px; }
+            .action-buttons { gap: 10px; }
+            .action-buttons .btn { padding: 12px 8px; font-size: 14px; min-height: 55px; }
+            .action-buttons .btn .icon { font-size: 22px; }
+            .summary-grid { grid-template-columns: 1fr; }
+            .lock-banner { flex-direction: column; text-align: center; }
+            .lock-banner .lock-text { font-size: 14px; }
+            .user-lock-banner { flex-direction: column; text-align: center; }
+            .user-lock-banner .lock-text { font-size: 13px; }
+        }
+        @media (max-width: 600px) {
+            .header-right .nav-btn { font-size: 11px; padding: 4px 10px; }
+            .header-right .user-name-btn { font-size: 11px; padding: 4px 10px; }
+            .header-right .logout-link { font-size: 11px; padding: 4px 10px; }
+            .action-buttons { gap: 8px; }
+            .action-buttons .btn { padding: 10px 6px; font-size: 13px; min-height: 50px; }
+            .action-buttons .btn .icon { font-size: 20px; }
+            .action-buttons .btn .sub-text { font-size: 10px; }
+        }
+        @media (max-width: 400px) {
+            .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .stat-card .number { font-size: 20px; }
+            .action-buttons { gap: 6px; }
+            .action-buttons .btn { padding: 8px 5px; font-size: 12px; min-height: 45px; }
+            .action-buttons .btn .icon { font-size: 18px; }
+            .action-buttons .btn .sub-text { font-size: 9px; }
         }
     </style>
 </head>
@@ -3539,7 +3768,7 @@ DASHBOARD_HTML = r'''
                 <span class="lock-time" id="lockTime">បើកដោយស្វ័យប្រវត្តិនៅម៉ោង 06:00</span>
             </div>
             {% if session.role == 'admin' %}
-            <button class="lock-btn" id="lockToggleBtn" onclick="openSystemLockModal()">🔒 បិទ/បើកប្រព័ន្ធ</button>
+            <button class="lock-btn" id="lockToggleBtn" onclick="toggleSystemLock()">បើកប្រព័ន្ធ</button>
             {% endif %}
         </div>
 
@@ -3732,7 +3961,6 @@ DASHBOARD_HTML = r'''
         </div>
     </div>
 
-    <!-- Modals & Scripts -->
     <div id="checkInModal" class="modal">
         <div class="modal-content">
             <h3>✅ ចូលធ្វើការ</h3>
@@ -3773,27 +4001,23 @@ DASHBOARD_HTML = r'''
         </div>
     </div>
 
+    <!-- System Lock Modal -->
     <div id="systemLockModal" class="modal">
         <div class="modal-content">
             <h3>🔒 បិទ/បើកប្រព័ន្ធចូលធ្វើការ</h3>
-            <p style="color:#dc3545;font-weight:600;">⚠️ ពេលបិទប្រព័ន្ធ បុគ្គលិកនឹងមិនអាចចុចចូល/ចេញធ្វើការបានទេ!</p>
+            <p>ការបិទប្រព័ន្ធនឹងរារាំងបុគ្គលិកទាំងអស់មិនអោយចុចចូល/ចេញធ្វើការបាន។</p>
             <div id="lockStatusInfo" class="location-info">
                 <span id="lockStatusText">ប្រព័ន្ធកំពុងបើក</span>
             </div>
             <div style="margin-bottom:15px;">
-                <label style="font-weight:600;color:#555;font-size:14px;">ម៉ោងបើកដោយស្វ័យប្រវត្តិ (HH:MM)</label>
+                <label style="font-weight:600;color:#555;font-size:14px;">ពេលវេលាបើកដោយស្វ័យប្រវត្តិ (HH:MM)</label>
                 <input type="time" id="autoUnlockTime" value="06:00" step="60">
-                <div style="font-size:12px;color:#888;margin-top:4px;">
-                    🔓 ពេលដល់ម៉ោងនេះ ប្រព័ន្ធនឹងបើកដោយស្វ័យប្រវត្តិ
-                </div>
+                <div style="font-size:12px;color:#888;margin-top:4px;">ប្រព័ន្ធនឹងបើកដោយស្វ័យប្រវត្តិនៅម៉ោងដែលបានកំណត់រៀងរាល់ថ្ងៃ</div>
             </div>
             <div class="btn-group">
-                <button id="lockToggleBtnModal" class="btn-danger" onclick="toggleSystemLockFromModal(1)">🔒 បិទប្រព័ន្ធឥឡូវនេះ</button>
-                <button class="btn-success" onclick="toggleSystemLockFromModal(0)" id="unlockBtnModal" style="display:none;">🔓 បើកប្រព័ន្ធឥឡូវនេះ</button>
+                <button id="lockToggleBtnModal" class="btn-danger" onclick="toggleSystemLockFromModal()">🔒 បិទប្រព័ន្ធ</button>
+                <button class="btn-success" onclick="toggleSystemLockFromModal()" id="unlockBtnModal" style="display:none;">🔓 បើកប្រព័ន្ធ</button>
                 <button class="btn-cancel" onclick="closeModal('systemLockModal')">បោះបង់</button>
-            </div>
-            <div id="unlockScheduledInfo" style="display:none;margin-top:12px;padding:10px;background:#fff3cd;border-radius:8px;color:#856404;font-size:14px;">
-                ⏰ ប្រព័ន្ធនឹងបើកដោយស្វ័យប្រវត្តិនៅម៉ោង <span id="scheduledUnlockTime">06:00</span>
             </div>
         </div>
     </div>
@@ -3836,68 +4060,2654 @@ DASHBOARD_HTML = r'''
     var autoUnlockTime = '06:00';
     var userLocked = {{ user_lock.is_locked|default(0) }};
 
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        var installBtn = document.getElementById('installBtn');
+        if (installBtn) {
+            installBtn.style.display = 'inline-block';
+        }
+    });
+
+    document.getElementById('installBtn').addEventListener('click', function() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function(choiceResult) {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                    document.getElementById('installBtn').style.display = 'none';
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        }
+    });
+
+    window.addEventListener('appinstalled', function() {
+        console.log('App installed successfully!');
+        document.getElementById('installBtn').style.display = 'none';
+    });
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        document.getElementById('installBtn').style.display = 'none';
+    }
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js')
+        .then(function(reg) {
+            console.log('Service Worker registered successfully!');
+        })
+        .catch(function(err) {
+            console.log('Service Worker registration failed:', err);
+        });
+    }
+
+    // ===== USER LOCK FUNCTIONS =====
+    function updateUserLockUI(locked, autoUnlockTime) {
+        var banner = document.getElementById('userLockBanner');
+        var text = document.getElementById('userLockText');
+        userLocked = locked;
+
+        if (locked) {
+            banner.className = 'user-lock-banner show';
+            var msg = '🔒 អ្នកត្រូវបានបិទការចូលធ្វើការដោយ Admin';
+            if (autoUnlockTime) {
+                msg += ' (បើកដោយស្វ័យប្រវត្តិនៅម៉ោង ' + autoUnlockTime + ')';
+            }
+            text.textContent = msg;
+            document.getElementById('checkinBtn').classList.add('disabled');
+            document.getElementById('checkoutBtn').classList.add('disabled');
+        } else {
+            banner.className = 'user-lock-banner';
+            if (!systemLocked) {
+                document.getElementById('checkinBtn').classList.remove('disabled');
+                document.getElementById('checkoutBtn').classList.remove('disabled');
+            }
+        }
+    }
+
+    // ===== SYSTEM LOCK FUNCTIONS =====
     function updateLockUI(lockStatus) {
         var banner = document.getElementById('lockBanner');
         var lockText = document.getElementById('lockText');
         var lockTime = document.getElementById('lockTime');
+        var toggleBtn = document.getElementById('lockToggleBtn');
+        var lockToggleModal = document.getElementById('lockToggleBtnModal');
+        var unlockModal = document.getElementById('unlockBtnModal');
+
         systemLocked = lockStatus.is_locked == 1;
         autoUnlockTime = lockStatus.auto_unlock_time || '06:00';
 
+        // Update banner
         if (systemLocked) {
             banner.className = 'lock-banner show';
             lockText.textContent = '🔒 ប្រព័ន្ធកំពុងបិទការចូលធ្វើការ';
             lockTime.textContent = '⏰ បើកដោយស្វ័យប្រវត្តិនៅម៉ោង ' + autoUnlockTime;
+            if (toggleBtn) {
+                toggleBtn.textContent = '🔓 បើកប្រព័ន្ធ';
+                toggleBtn.style.background = 'rgba(255,255,255,0.2)';
+            }
+            if (lockToggleModal) {
+                lockToggleModal.style.display = 'none';
+                unlockModal.style.display = 'block';
+                unlockModal.textContent = '🔓 បើកប្រព័ន្ធ';
+            }
+            // Disable checkin/checkout buttons
+            document.getElementById('checkinBtn').classList.add('disabled');
+            document.getElementById('checkoutBtn').classList.add('disabled');
+
+            // Show lock message
+            var statusMsg = document.getElementById('statusMessage');
+            statusMsg.className = 'status-message locked';
+            statusMsg.innerHTML = '🔒 ប្រព័ន្ធកំពុងបិទការចូលធ្វើការ! សូមរង់ចាំរហូតដល់ម៉ោង ' + autoUnlockTime + ' ឬទាក់ទង Admin!';
+            statusMsg.style.display = 'block';
         } else {
             banner.className = 'lock-banner show unlocked';
             lockText.textContent = '🔓 ប្រព័ន្ធកំពុងបើក';
             lockTime.textContent = '✅ អនុញ្ញាតអោយចុចចូល/ចេញធ្វើការ';
+            if (toggleBtn) {
+                toggleBtn.textContent = '🔒 បិទប្រព័ន្ធ';
+                toggleBtn.style.background = 'rgba(220,53,69,0.3)';
+            }
+            if (lockToggleModal) {
+                lockToggleModal.style.display = 'block';
+                lockToggleModal.textContent = '🔒 បិទប្រព័ន្ធ';
+                unlockModal.style.display = 'none';
+            }
+            // Enable buttons if user not locked
+            if (!userLocked) {
+                document.getElementById('checkinBtn').classList.remove('disabled');
+                document.getElementById('checkoutBtn').classList.remove('disabled');
+            }
+
+            var statusMsg = document.getElementById('statusMessage');
+            if (statusMsg.className === 'status-message locked') {
+                statusMsg.className = 'status-message info';
+                statusMsg.innerHTML = '🔵 ប្រព័ន្ធកំពុងបើក។ អ្នកអាចចុចចូល/ចេញធ្វើការបាន!';
+                statusMsg.style.display = 'block';
+            }
+        }
+
+        // Update lock status text in modal
+        var statusText = document.getElementById('lockStatusText');
+        if (statusText) {
+            if (systemLocked) {
+                statusText.textContent = '🔒 ប្រព័ន្ធកំពុងបិទ (បើកដោយស្វ័យប្រវត្តិនៅម៉ោង ' + autoUnlockTime + ')';
+                statusText.style.color = '#dc3545';
+            } else {
+                statusText.textContent = '🔓 ប្រព័ន្ធកំពុងបើក';
+                statusText.style.color = '#34a853';
+            }
         }
     }
 
     function getSystemLockStatus() {
         fetch('/get_system_lock_status')
         .then(function(res) { return res.json(); })
-        .then(function(data) { updateLockUI(data); })
+        .then(function(data) {
+            updateLockUI(data);
+        })
         .catch(function(err) { console.log('Lock status error:', err); });
     }
 
-    function openModal(id) { document.getElementById(id).classList.add('show'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+    function openSystemLockModal() {
+        getSystemLockStatus();
+        var autoTime = document.getElementById('autoUnlockTime');
+        if (autoTime) {
+            autoTime.value = autoUnlockTime || '06:00';
+        }
+        openModal('systemLockModal');
+    }
+
+    function toggleSystemLock() {
+        var newState = systemLocked ? 0 : 1;
+        var autoTime = document.getElementById('autoUnlockTime');
+        var unlockTime = autoTime ? autoTime.value : '06:00';
+
+        if (!unlockTime) {
+            unlockTime = '06:00';
+        }
+
+        fetch('/toggle_system_lock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lock_state: newState,
+                auto_unlock_time: unlockTime
+            })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(result) {
+            alert(result.message);
+            if (result.success) {
+                getSystemLockStatus();
+                if (document.getElementById('systemLockModal').classList.contains('show')) {
+                    closeModal('systemLockModal');
+                }
+            }
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    function toggleSystemLockFromModal() {
+        toggleSystemLock();
+    }
+
+    // ===== END SYSTEM LOCK FUNCTIONS =====
+
+    function checkDataVersion() {
+        fetch('/get_data_version')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.version > currentDataVersion) {
+                console.log('Data changed! Refreshing...');
+                currentDataVersion = data.version;
+                location.reload();
+            }
+        })
+        .catch(function(err) { console.log('Data version check error:', err); });
+    }
+
+    function startDataVersionChecker() {
+        checkDataVersion();
+        dataCheckInterval = setInterval(checkDataVersion, 3000);
+    }
+
+    function stopDataVersionChecker() {
+        if (dataCheckInterval) {
+            clearInterval(dataCheckInterval);
+            dataCheckInterval = null;
+        }
+    }
+
+    function updateButtonStatus() {
+        fetch('/get_checkin_status')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            var checkinBtn = document.getElementById('checkinBtn');
+            var checkoutBtn = document.getElementById('checkoutBtn');
+
+            if (systemLocked || userLocked) {
+                checkinBtn.classList.add('disabled');
+                checkoutBtn.classList.add('disabled');
+                return;
+            }
+
+            checkinBtn.disabled = false;
+            checkoutBtn.disabled = false;
+
+            if (data.has_checkin) {
+                var shiftNames = {1: 'វគ្គ 1', 2: 'វគ្គ 2', 3: 'វគ្គ 3'};
+                var shiftText = shiftNames[data.shift] || '';
+                var statusMsg = document.getElementById('statusMessage');
+                statusMsg.className = 'status-message warning';
+                statusMsg.innerHTML =
+                    '🟢 អ្នកកំពុងធ្វើការ (' + shiftText + ') ចាប់ពីម៉ោង ' +
+                    (data.check_in_time ? data.check_in_time.split(' ')[1].slice(0,5) : '') +
+                    '។ សូមចុច "ចេញពីធ្វើការ" មុនពេលចូលម្តងទៀត!';
+                statusMsg.style.display = 'block';
+            } else if (!systemLocked && !userLocked) {
+                var statusMsg = document.getElementById('statusMessage');
+                statusMsg.className = 'status-message info';
+                statusMsg.innerHTML =
+                    '🔵 អ្នកមិនទាន់ចូលធ្វើការនៅថ្ងៃនេះទេ។ សូមចុច "ចូលធ្វើការ" ដើម្បីចាប់ផ្តើម!';
+                statusMsg.style.display = 'block';
+            }
+        })
+        .catch(function(err) { console.log('Update status error:', err); });
+    }
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('show');
+    }
+
+    function closeModal(id) {
+        var modal = document.getElementById(id);
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
     function closeLocationModal() { closeModal('locationModal'); }
     function closeRequestsModal() { closeModal('requestsModal'); }
     function openLocationModal() { openModal('locationModal'); }
-    function openRequestsModal() { openModal('requestsModal'); }
+    function openRequestsModal() { openModal('requestsModal'); loadRequests(); }
     function openCleanModal() { openModal('cleanModal'); }
 
+    function cleanData(type) {
+        var typeNames = {
+            'all': 'ទិន្នន័យទាំងអស់',
+            'attendance': 'ទិន្នន័យវត្តមាន',
+            'leaves': 'ទិន្នន័យសុំច្បាប់',
+            'missions': 'ទិន្នន័យបេសកម្ម'
+        };
+        if (!confirm('តើអ្នកពិតជាចង់សម្អាត ' + typeNames[type] + ' មែនទេ?\n\nការសម្អាតនេះមិនអាចស្តារឡើងវិញបានទេ!')) return;
+        if (!confirm('សូមបញ្ជាក់ម្តងទៀត: តើអ្នកប្រាកដជាចង់លុប ' + typeNames[type] + ' មែនទេ?')) return;
+
+        fetch('/clean_data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            alert(result.message);
+            if (result.success) {
+                closeModal('cleanModal');
+                location.reload();
+            }
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('មានបញ្ហា: ' + err);
+        });
+    }
+
+    function loadRequests() {
+        fetch('/get_pending_requests')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            var html = '';
+            if (data.leaves.length === 0 && data.missions.length === 0) {
+                html = '<p style="text-align:center;color:#888;padding:20px;">📭 មិនមានសំណើរង់ចាំ</p>';
+            }
+            for (var i = 0; i < data.leaves.length; i++) {
+                var item = data.leaves[i];
+                var attachmentHtml = '';
+                if (item.attachment) {
+                    var ext = item.attachment.split('.').pop().toLowerCase();
+                    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].indexOf(ext) !== -1) {
+                        attachmentHtml = '<div style="margin-top:5px;"><a href="' + item.attachment + '" target="_blank" style="color:#1a73e8;text-decoration:none;">🖼️ មើលរូបភាព</a></div>';
+                    } else {
+                        attachmentHtml = '<div style="margin-top:5px;"><a href="' + item.attachment + '" target="_blank" style="color:#1a73e8;text-decoration:none;">📎 ទាញយកឯកសារ</a></div>';
+                    }
+                }
+                html += '<div class="request-item">' +
+                    '<div class="request-user">📋 ' + item.full_name + ' (' + item.username + ')</div>' +
+                    '<div class="request-detail">សុំច្បាប់: ' + item.days + ' ថ្ងៃ | ' + item.start_date + ' ដល់ ' + item.end_date + ' | មូលហេតុ: ' + (item.reason || 'មិនបានបញ្ជាក់') + '</div>' +
+                    attachmentHtml +
+                    '<div class="request-actions">' +
+                        '<button class="approve-btn" onclick="approveRequest(\'leave\', ' + item.id + ')">✅ អនុម័ត</button>' +
+                        '<button class="reject-btn" onclick="rejectRequest(\'leave\', ' + item.id + ')">❌ បដិសេធ</button>' +
+                    '</div>' +
+                '</div>';
+            }
+            for (var j = 0; j < data.missions.length; j++) {
+                var item2 = data.missions[j];
+                var attachmentHtml2 = '';
+                if (item2.attachment) {
+                    var ext2 = item2.attachment.split('.').pop().toLowerCase();
+                    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].indexOf(ext2) !== -1) {
+                        attachmentHtml2 = '<div style="margin-top:5px;"><a href="' + item2.attachment + '" target="_blank" style="color:#1a73e8;text-decoration:none;">🖼️ មើលរូបភាព</a></div>';
+                    } else {
+                        attachmentHtml2 = '<div style="margin-top:5px;"><a href="' + item2.attachment + '" target="_blank" style="color:#1a73e8;text-decoration:none;">📎 ទាញយកឯកសារ</a></div>';
+                    }
+                }
+                html += '<div class="request-item">' +
+                    '<div class="request-user">🚗 ' + item2.full_name + ' (' + item2.username + ')</div>' +
+                    '<div class="request-detail">បេសកម្ម: ' + item2.days + ' ថ្ងៃ | ' + item2.start_date + ' ដល់ ' + item2.end_date + ' | ទីតាំង: ' + (item2.destination || 'មិនបានបញ្ជាក់') + '</div>' +
+                    attachmentHtml2 +
+                    '<div class="request-actions">' +
+                        '<button class="approve-btn" onclick="approveRequest(\'mission\', ' + item2.id + ')">✅ អនុម័ត</button>' +
+                        '<button class="reject-btn" onclick="rejectRequest(\'mission\', ' + item2.id + ')">❌ បដិសេធ</button>' +
+                    '</div>' +
+                '</div>';
+            }
+            document.getElementById('requestsList').innerHTML = html;
+        })
+        .catch(function(err) {
+            document.getElementById('requestsList').innerHTML = '<p style="text-align:center;color:red;">មានបញ្ហា: ' + err + '</p>';
+        });
+    }
+
+    function approveRequest(type, id) {
+        if (!confirm('តើអ្នកចង់អនុម័តសំណើនេះមែនទេ?')) return;
+        fetch('/approve_request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, id: id })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(result) {
+            alert(result.message);
+            if (result.success) {
+                loadRequests();
+                window.location.reload();
+            }
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    function rejectRequest(type, id) {
+        if (!confirm('តើអ្នកចង់បដិសេធសំណើនេះមែនទេ?')) return;
+        fetch('/reject_request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, id: id })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(result) {
+            alert(result.message);
+            if (result.success) {
+                loadRequests();
+                window.location.reload();
+            }
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    function getCurrentLocation() {
+        if (!navigator.geolocation) {
+            alert('កម្មវិធីរុករករបស់អ្នកមិនគាំទ្រការចាប់ទីតាំងទេ!');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                document.getElementById('companyLat').value = pos.coords.latitude;
+                document.getElementById('companyLng').value = pos.coords.longitude;
+                document.getElementById('locationInfo').innerHTML =
+                    '📍 ទីតាំងបច្ចុប្បន្ន: ' + pos.coords.latitude + ', ' + pos.coords.longitude;
+            },
+            function(err) {
+                alert('មិនអាចចាប់យកទីតាំងបាន! សូមបញ្ចូលដោយដៃ។');
+                console.log(err);
+            }
+        );
+    }
+
+    function saveCompanyLocation() {
+        var lat = document.getElementById('companyLat').value.trim();
+        var lng = document.getElementById('companyLng').value.trim();
+        if (!lat || !lng) {
+            alert('សូមបញ្ចូលទីតាំងឲ្យបានពេញលេញ!');
+            return;
+        }
+        fetch('/save_location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat: parseFloat(lat), lng: parseFloat(lng) })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                alert('✅ រក្សាទុកទីតាំងជោគជ័យ!');
+                document.getElementById('locationInfo').innerHTML =
+                    '📍 ទីតាំងបច្ចុប្បន្ន: ' + lat + ', ' + lng;
+                closeLocationModal();
+                location.reload();
+            } else {
+                alert('❌ ' + data.message);
+            }
+        })
+        .catch(function(err) { alert('មានបញ្ហា: ' + err); });
+    }
+
+    function openCheckInModal() {
+        if (systemLocked) {
+            alert('⛔ ប្រព័ន្ធកំពុងបិទការចូលធ្វើការ! សូមរង់ចាំរហូតដល់ម៉ោង ' + autoUnlockTime + ' ឬទាក់ទង Admin!');
+            return;
+        }
+        if (userLocked) {
+            alert('⛔ អ្នកត្រូវបានបិទការចូលធ្វើការដោយ Admin! សូមទាក់ទង Admin!');
+            return;
+        }
+
+        if (!navigator.geolocation) {
+            alert('កម្មវិធីរុករករបស់អ្នកមិនគាំទ្រការចាប់ទីតាំងទេ!');
+            return;
+        }
+
+        document.getElementById('checkInLocationInfo').innerHTML = '⏳ កំពុងចាប់យកទីតាំង...';
+
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                userLocation = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                };
+                document.getElementById('checkInLocationInfo').innerHTML =
+                    '📍 ទីតាំងរបស់អ្នក: ' + pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6) +
+                    '<br>📏 កំពុងពិនិត្យចម្ងាយ...';
+                openModal('checkInModal');
+            },
+            function(err) {
+                document.getElementById('checkInLocationInfo').innerHTML =
+                    '⚠️ មិនអាចចាប់យកទីតាំង! សូមបើក GPS ហើយចុចសាកល្បងម្តងទៀត<br>' +
+                    '<button onclick="openCheckInModal()" style="margin-top:10px;padding:8px 20px;background:#1a73e8;color:white;border:none;border-radius:8px;cursor:pointer;">🔄 សាកល្បងម្តងទៀត</button>';
+                console.log(err);
+            }
+        );
+    }
+
+    function submitCheckIn() {
+        if (!userLocation) {
+            alert('សូមចាប់យកទីតាំងរបស់អ្នកមុន!');
+            return;
+        }
+
+        var shift = document.getElementById('shiftSelect').value;
+
+        fetch('/get_company_location')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (!data.lat || !data.lng) {
+                alert('សូមឲ្យ Admin កំណត់ទីតាំងក្រុមហ៊ុនជាមុនសិន!');
+                return;
+            }
+
+            fetch('/check_in', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_lat: userLocation.lat,
+                    user_lng: userLocation.lng,
+                    company_lat: data.lat,
+                    company_lng: data.lng,
+                    shift: parseInt(shift)
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(result) {
+                alert(result.message);
+                if (result.success) {
+                    closeModal('checkInModal');
+                    window.location.reload();
+                }
+            })
+            .catch(function(err) {
+                console.error('Error:', err);
+                alert('មានបញ្ហា: ' + err.message);
+            });
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    function handleCheckOut() {
+        if (systemLocked) {
+            alert('⛔ ប្រព័ន្ធកំពុងបិទការចូលធ្វើការ! សូមរង់ចាំរហូតដល់ម៉ោង ' + autoUnlockTime + ' ឬទាក់ទង Admin!');
+            return;
+        }
+        if (userLocked) {
+            alert('⛔ អ្នកត្រូវបានបិទការចូលធ្វើការដោយ Admin! សូមទាក់ទង Admin!');
+            return;
+        }
+
+        if (!confirm('តើអ្នកចង់ចេញពីធ្វើការមែនទេ?')) return;
+
+        if (!navigator.geolocation) {
+            alert('កម្មវិធីរុករករបស់អ្នកមិនគាំទ្រការចាប់ទីតាំងទេ!');
+            return;
+        }
+
+        var statusMsg = document.getElementById('statusMessage');
+        if (statusMsg) {
+            statusMsg.className = 'status-message info';
+            statusMsg.innerHTML = '⏳ កំពុងចាប់យកទីតាំងសម្រាប់ចេញធ្វើការ...';
+            statusMsg.style.display = 'block';
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                var location = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                };
+
+                fetch('/get_company_location')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (!data.lat || !data.lng) {
+                        alert('សូមឲ្យ Admin កំណត់ទីតាំងក្រុមហ៊ុនជាមុនសិន!');
+                        return;
+                    }
+
+                    fetch('/check_out', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_lat: location.lat,
+                            user_lng: location.lng,
+                            company_lat: data.lat,
+                            company_lng: data.lng
+                        })
+                    })
+                    .then(function(res) { return res.json(); })
+                    .then(function(result) {
+                        alert(result.message);
+                        if (result.success) {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('Error:', err);
+                        alert('មានបញ្ហា: ' + err.message);
+                    });
+                })
+                .catch(function(err) {
+                    console.error('Error:', err);
+                    alert('មានបញ្ហា: ' + err.message);
+                });
+            },
+            function(err) {
+                var statusMsg = document.getElementById('statusMessage');
+                if (statusMsg) {
+                    statusMsg.className = 'status-message danger';
+                    statusMsg.innerHTML = '⚠️ មិនអាចចាប់យកទីតាំង! សូមបើក GPS ហើយព្យាយាមម្តងទៀត';
+                    statusMsg.style.display = 'block';
+                }
+                console.log('Geolocation error:', err);
+            }
+        );
+    }
+
+    function handleLeave() {
+        var html =
+            '<div style="padding:10px;">' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ចំនួនថ្ងៃ (អាចជា 0.5):</label>' +
+                    '<input type="number" id="leaveDays" step="0.5" min="0.5" value="1" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ចាប់ពីថ្ងៃ:</label>' +
+                    '<input type="date" id="leaveStartDate" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ដល់ថ្ងៃ:</label>' +
+                    '<input type="date" id="leaveEndDate" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>មូលហេតុ:</label>' +
+                    '<textarea id="leaveReason" rows="3" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;font-family:\'Khmer OS\',Arial;" placeholder="សូមបញ្ចូលមូលហេតុ..."></textarea>' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ឯកសារភ្ជាប់ (រូបភាព ឬ PDF):</label>' +
+                    '<input type="file" id="leaveAttachment" accept="image/*,.pdf,.doc,.docx" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;font-family:\'Khmer OS\',Arial;">' +
+                    '<div style="font-size:12px;color:#888;margin-top:4px;">📎 អាចភ្ជាប់រូបភាព, PDF, Word (អតិបរមា 5MB)</div>' +
+                '</div>' +
+                '<div id="attachmentPreview" style="display:none;margin-bottom:10px;padding:10px;background:#f8f9fa;border-radius:8px;text-align:center;">' +
+                    '<img id="previewImage" src="" style="max-width:200px;max-height:200px;border-radius:8px;display:none;">' +
+                    '<a id="previewLink" href="#" target="_blank" style="display:none;color:#1a73e8;text-decoration:none;">📄 មើលឯកសារ</a>' +
+                    '<button onclick="removeAttachment()" style="display:block;margin-top:5px;padding:4px 12px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">❌ លុប</button>' +
+                '</div>' +
+                '<div style="display:flex;gap:10px;margin-top:10px;">' +
+                    '<button onclick="submitLeave()" style="flex:1;padding:10px;background:#34a853;color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-family:\'Khmer OS\',Arial;">✅ បញ្ជូន</button>' +
+                    '<button onclick="closeModal(\'leaveModal\')" style="flex:1;padding:10px;background:#e8ecf1;color:#333;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-family:\'Khmer OS\',Arial;">បោះបង់</button>' +
+                '</div>' +
+            '</div>';
+
+        var modal = document.createElement('div');
+        modal.id = 'leaveModal';
+        modal.className = 'modal show';
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:500px;">' +
+                '<h3>📋 សុំច្បាប់</h3>' +
+                html +
+            '</div>';
+        document.body.appendChild(modal);
+
+        var today = new Date().toISOString().split('T')[0];
+        document.getElementById('leaveStartDate').value = today;
+        document.getElementById('leaveEndDate').value = today;
+
+        var fileInput = document.getElementById('leaveAttachment');
+        fileInput.addEventListener('change', function(e) {
+            var file = this.files[0];
+            if (file) {
+                var previewDiv = document.getElementById('attachmentPreview');
+                var previewImage = document.getElementById('previewImage');
+                var previewLink = document.getElementById('previewLink');
+
+                previewDiv.style.display = 'block';
+                previewImage.style.display = 'none';
+                previewLink.style.display = 'none';
+
+                if (file.type.startsWith('image/')) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImage.src = e.target.result;
+                        previewImage.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    previewLink.textContent = '📄 ' + file.name;
+                    previewLink.style.display = 'block';
+                    previewLink.href = '#';
+                    previewLink.onclick = function(e) {
+                        e.preventDefault();
+                        alert('ឯកសារ: ' + file.name + '\nទំហំ: ' + (file.size / 1024).toFixed(2) + ' KB');
+                    };
+                }
+            }
+        });
+    }
+
+    function removeAttachment() {
+        var fileInput = document.getElementById('leaveAttachment');
+        fileInput.value = '';
+        document.getElementById('attachmentPreview').style.display = 'none';
+        document.getElementById('previewImage').style.display = 'none';
+        document.getElementById('previewLink').style.display = 'none';
+    }
+
+    function submitLeave() {
+        var days = document.getElementById('leaveDays').value;
+        var start_date = document.getElementById('leaveStartDate').value;
+        var end_date = document.getElementById('leaveEndDate').value;
+        var reason = document.getElementById('leaveReason').value.trim();
+        var fileInput = document.getElementById('leaveAttachment');
+        var file = fileInput.files[0];
+
+        if (!start_date || !end_date) {
+            alert('សូមជ្រើសរើសថ្ងៃ!');
+            return;
+        }
+        if (!reason) {
+            alert('សូមបញ្ចូលមូលហេតុ!');
+            return;
+        }
+        if (parseFloat(days) <= 0) {
+            alert('សូមបញ្ចូលចំនួនថ្ងៃឲ្យបានត្រឹមត្រូវ!');
+            return;
+        }
+
+        if (file && file.size > 5 * 1024 * 1024) {
+            alert('ឯកសារធំពេក! សូមជ្រើសរើសឯកសារដែលមានទំហំតិចជាង 5MB');
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('start_date', start_date);
+        formData.append('end_date', end_date);
+        formData.append('days', parseFloat(days));
+        formData.append('reason', reason);
+        if (file) {
+            formData.append('attachment', file);
+        }
+
+        fetch('/request_leave', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            alert(result.message);
+            if (result.success) {
+                closeModal('leaveModal');
+                window.location.reload();
+            }
+        })
+        .catch(function(err) {
+            console.error("Error:", err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    function handleMission() {
+        var html =
+            '<div style="padding:10px;">' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ចំនួនថ្ងៃ (អាចជា 0.5):</label>' +
+                    '<input type="number" id="missionDays" step="0.5" min="0.5" value="1" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ចាប់ពីថ្ងៃ:</label>' +
+                    '<input type="date" id="missionStartDate" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ដល់ថ្ងៃ:</label>' +
+                    '<input type="date" id="missionEndDate" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ទីតាំងបេសកម្ម:</label>' +
+                    '<input type="text" id="missionDestination" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;font-family:\'Khmer OS\',Arial;" placeholder="សូមបញ្ចូលទីតាំង...">' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>គោលបំណង:</label>' +
+                    '<textarea id="missionPurpose" rows="3" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;font-family:\'Khmer OS\',Arial;" placeholder="សូមបញ្ចូលគោលបំណង..."></textarea>' +
+                '</div>' +
+                '<div style="margin-bottom:10px;">' +
+                    '<label>ឯកសារភ្ជាប់ (រូបភាព ឬ PDF):</label>' +
+                    '<input type="file" id="missionAttachment" accept="image/*,.pdf,.doc,.docx" style="width:100%;padding:8px;border:2px solid #e8ecf1;border-radius:8px;font-family:\'Khmer OS\',Arial;">' +
+                    '<div style="font-size:12px;color:#888;margin-top:4px;">📎 អាចភ្ជាប់រូបភាព, PDF, Word (អតិបរមា 5MB)</div>' +
+                '</div>' +
+                '<div id="missionAttachmentPreview" style="display:none;margin-bottom:10px;padding:10px;background:#f8f9fa;border-radius:8px;text-align:center;">' +
+                    '<img id="missionPreviewImage" src="" style="max-width:200px;max-height:200px;border-radius:8px;display:none;">' +
+                    '<a id="missionPreviewLink" href="#" target="_blank" style="display:none;color:#1a73e8;text-decoration:none;">📄 មើលឯកសារ</a>' +
+                    '<button onclick="removeMissionAttachment()" style="display:block;margin-top:5px;padding:4px 12px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">❌ លុប</button>' +
+                '</div>' +
+                '<div style="display:flex;gap:10px;margin-top:10px;">' +
+                    '<button onclick="submitMission()" style="flex:1;padding:10px;background:#1a73e8;color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-family:\'Khmer OS\',Arial;">✅ បញ្ជូន</button>' +
+                    '<button onclick="closeModal(\'missionModal\')" style="flex:1;padding:10px;background:#e8ecf1;color:#333;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-family:\'Khmer OS\',Arial;">បោះបង់</button>' +
+                '</div>' +
+            '</div>';
+
+        var modal = document.createElement('div');
+        modal.id = 'missionModal';
+        modal.className = 'modal show';
+        modal.innerHTML =
+            '<div class="modal-content" style="max-width:500px;">' +
+                '<h3>🚗 សុំបេសកម្ម</h3>' +
+                html +
+            '</div>';
+        document.body.appendChild(modal);
+
+        var today = new Date().toISOString().split('T')[0];
+        document.getElementById('missionStartDate').value = today;
+        document.getElementById('missionEndDate').value = today;
+
+        var fileInput = document.getElementById('missionAttachment');
+        fileInput.addEventListener('change', function(e) {
+            var file = this.files[0];
+            if (file) {
+                var previewDiv = document.getElementById('missionAttachmentPreview');
+                var previewImage = document.getElementById('missionPreviewImage');
+                var previewLink = document.getElementById('missionPreviewLink');
+
+                previewDiv.style.display = 'block';
+                previewImage.style.display = 'none';
+                previewLink.style.display = 'none';
+
+                if (file.type.startsWith('image/')) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImage.src = e.target.result;
+                        previewImage.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    previewLink.textContent = '📄 ' + file.name;
+                    previewLink.style.display = 'block';
+                    previewLink.href = '#';
+                    previewLink.onclick = function(e) {
+                        e.preventDefault();
+                        alert('ឯកសារ: ' + file.name + '\nទំហំ: ' + (file.size / 1024).toFixed(2) + ' KB');
+                    };
+                }
+            }
+        });
+    }
+
+    function removeMissionAttachment() {
+        var fileInput = document.getElementById('missionAttachment');
+        fileInput.value = '';
+        document.getElementById('missionAttachmentPreview').style.display = 'none';
+        document.getElementById('missionPreviewImage').style.display = 'none';
+        document.getElementById('missionPreviewLink').style.display = 'none';
+    }
+
+    function submitMission() {
+        var days = document.getElementById('missionDays').value;
+        var start_date = document.getElementById('missionStartDate').value;
+        var end_date = document.getElementById('missionEndDate').value;
+        var destination = document.getElementById('missionDestination').value.trim();
+        var purpose = document.getElementById('missionPurpose').value.trim();
+        var fileInput = document.getElementById('missionAttachment');
+        var file = fileInput.files[0];
+
+        if (!start_date || !end_date) {
+            alert('សូមជ្រើសរើសថ្ងៃ!');
+            return;
+        }
+        if (!destination) {
+            alert('សូមបញ្ចូលទីតាំងបេសកម្ម!');
+            return;
+        }
+        if (parseFloat(days) <= 0) {
+            alert('សូមបញ្ចូលចំនួនថ្ងៃឲ្យបានត្រឹមត្រូវ!');
+            return;
+        }
+
+        if (file && file.size > 5 * 1024 * 1024) {
+            alert('ឯកសារធំពេក! សូមជ្រើសរើសឯកសារដែលមានទំហំតិចជាង 5MB');
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('start_date', start_date);
+        formData.append('end_date', end_date);
+        formData.append('days', parseFloat(days));
+        formData.append('destination', destination);
+        formData.append('purpose', purpose || 'បំពេញបេសកម្ម');
+        if (file) {
+            formData.append('attachment', file);
+        }
+
+        fetch('/request_mission', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            alert(result.message);
+            if (result.success) {
+                closeModal('missionModal');
+                window.location.reload();
+            }
+        })
+        .catch(function(err) {
+            console.error("Error:", err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    function checkNewRequests() {
+        fetch('/check_new_requests')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            var requestBtn = document.querySelector('.header-right .nav-btn[onclick="openRequestsModal()"]');
+            if (requestBtn) {
+                var oldBadge = requestBtn.querySelector('span');
+                if (oldBadge) {
+                    oldBadge.remove();
+                }
+                if (data.count > 0) {
+                    var badge = document.createElement('span');
+                    badge.style.cssText = 'background:red;color:white;border-radius:50%;padding:0 6px;font-size:11px;margin-left:3px;';
+                    badge.textContent = data.count;
+                    requestBtn.appendChild(badge);
+                }
+            }
+
+            if (!isFirstCheck && data.new && data.message) {
+                showNotification(data.message);
+            }
+            isFirstCheck = false;
+        })
+        .catch(function(err) { console.log('Notification error:', err); });
+    }
+
+    function showNotification(message) {
+        var popup = document.createElement('div');
+        popup.style.cssText =
+            'position: fixed;' +
+            'top: 20px;' +
+            'right: 20px;' +
+            'background: linear-gradient(135deg, #1a73e8, #0d47a1);' +
+            'color: white;' +
+            'padding: 20px 25px;' +
+            'border-radius: 12px;' +
+            'box-shadow: 0 8px 30px rgba(0,0,0,0.3);' +
+            'z-index: 9999;' +
+            'max-width: 400px;' +
+            'font-family: \'Khmer OS\', \'Khmer OS Muol\', \'Arial\', sans-serif;' +
+            'animation: slideIn 0.5s ease;' +
+            'border-left: 5px solid #ffc107;';
+        popup.innerHTML =
+            '<div style="display:flex;align-items:center;gap:12px;">' +
+                '<span style="font-size:30px;">📬</span>' +
+                '<div>' +
+                    '<div style="font-weight:600;font-size:16px;margin-bottom:4px;">ការជូនដំណឹង!</div>' +
+                    '<div style="font-size:14px;opacity:0.9;">' + message + '</div>' +
+                '</div>' +
+                '<button onclick="this.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.2);border:none;color:white;font-size:20px;cursor:pointer;padding:0 8px;border-radius:50%;">×</button>' +
+            '</div>';
+        document.body.appendChild(popup);
+
+        setTimeout(function() {
+            if (popup.parentElement) {
+                popup.style.animation = 'slideOut 0.5s ease';
+                setTimeout(function() {
+                    popup.remove();
+                }, 500);
+            }
+        }, 10000);
+    }
+
+    function startNotificationChecker() {
+        checkNewRequests();
+        notificationInterval = setInterval(checkNewRequests, 30000);
+    }
+
+    function stopNotificationChecker() {
+        if (notificationInterval) {
+            clearInterval(notificationInterval);
+            notificationInterval = null;
+        }
+    }
+
+    function deleteAttendance(id) {
+        console.log('Delete button clicked for ID:', id);
+
+        if (!confirm('តើអ្នកចង់លុបទិន្នន័យនេះមែនទេ?')) {
+            return;
+        }
+
+        fetch('/delete_attendance/' + id, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response) {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(function(result) {
+            console.log('Result:', result);
+            alert(result.message);
+            if (result.success) {
+                window.location.reload();
+            }
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('មានបញ្ហា: ' + err.message);
+        });
+    }
+
+    var style = document.createElement('style');
+    style.textContent =
+        '@keyframes slideIn {' +
+            'from { transform: translateX(100%); opacity: 0; }' +
+            'to { transform: translateX(0); opacity: 1; }' +
+        '}' +
+        '@keyframes slideOut {' +
+            'from { transform: translateX(0); opacity: 1; }' +
+            'to { transform: translateX(100%); opacity: 0; }' +
+        '}';
+    document.head.appendChild(style);
+
+    // Initialize
     getSystemLockStatus();
+    updateButtonStatus();
+    startDataVersionChecker();
+
+    {% if session.role == 'admin' %}
+    startNotificationChecker();
+    {% endif %}
+
+    setInterval(updateButtonStatus, 10000);
     setInterval(getSystemLockStatus, 60000);
+
+    window.addEventListener('beforeunload', function() {
+        stopDataVersionChecker();
+        stopNotificationChecker();
+    });
+
+    // ===== AUTO-UNLOCK CHECKER (Client-side) =====
+function checkAutoUnlock() {
+    fetch('/check_auto_unlock')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success && data.unlocked && data.unlocked.length > 0) {
+            console.log('Auto-unlock performed:', data.unlocked);
+            // Refresh lock status
+            getSystemLockStatus();
+            // Show notification
+            showNotification('🔓 ប្រព័ន្ធបានបើកដោយស្វ័យប្រវត្តិ!');
+            // Reload page to update UI
+            setTimeout(function() {
+                location.reload();
+            }, 2000);
+        }
+    })
+    .catch(function(err) {
+        console.log('Auto-unlock check error:', err);
+    });
+}
+
+// Check auto-unlock every 30 seconds
+setInterval(checkAutoUnlock, 30000);
+// Check immediately on page load
+setTimeout(checkAutoUnlock, 5000);
     </script>
 </body>
 </html>
 '''
 
+# ============================================================
+# HTML TEMPLATES (unchanged)
+# ============================================================
+
 REGISTER_HTML = '''<!DOCTYPE html>
 <html>
-<head><title>ចុះឈ្មោះ</title><meta charset="UTF-8"></head>
-<body><h2>ចុះឈ្មោះ</h2></body>
+<head>
+    <title>ចុះឈ្មោះអ្នកប្រើប្រាស់</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; background: #f0f2f5; padding: 15px; min-height: 100vh; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .header {
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header-left h2 { font-size: 18px; font-weight: 600; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .header-right .back-link {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            transition: all 0.3s;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        }
+        .header-right .back-link:hover { background: rgba(255,255,255,0.35); }
+        .header-right .user-name {
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(255,255,255,0.15);
+        }
+        .form-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .form-container h3 { color: #333; font-size: 20px; margin-bottom: 5px; }
+        .form-container .sub-title { color: #888; font-size: 14px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-weight: 600; color: #555; font-size: 14px; margin-bottom: 5px; }
+        .form-group label .required { color: #dc3545; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e8ecf1;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #1a73e8;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+        }
+        .form-group .hint { font-size: 12px; color: #aaa; margin-top: 4px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #34a853, #1e7e34);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+            transition: all 0.3s;
+            margin-top: 5px;
+        }
+        .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(52, 168, 83, 0.3); }
+        .btn-submit:active { transform: scale(0.98); }
+        .message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .message.success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+        .message.error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+        .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; gap: 0; }
+            .header { flex-direction: column; text-align: center; }
+            .header-left h2 { font-size: 16px; }
+            .form-container { padding: 20px; }
+            .form-group input, .form-group select { font-size: 14px; padding: 10px 12px; }
+        }
+        @media (max-width: 400px) {
+            .form-container { padding: 15px; }
+            .form-group input, .form-group select { font-size: 13px; padding: 8px 10px; }
+            .btn-submit { font-size: 16px; padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h2>📝 ចុះឈ្មោះអ្នកប្រើប្រាស់</h2>
+            </div>
+            <div class="header-right">
+                <span class="user-name">👤 {{ session.username }}</span>
+                <a href="/dashboard" class="back-link">← ត្រលប់</a>
+            </div>
+        </div>
+        {% if message %}
+        <div class="message {{ message_type }}">{{ message }}</div>
+        {% endif %}
+        <div class="form-container">
+            <h3>📋 បំពេញព័ត៌មាន</h3>
+            <div class="sub-title">សូមបំពេញព័ត៌មានឲ្យបានត្រឹមត្រូវ</div>
+            <form method="POST">
+                <div class="form-group">
+                    <label>ឈ្មោះអ្នកប្រើ <span class="required">*</span></label>
+                    <input type="text" name="username" placeholder="ឧ: sok_sovan" required>
+                    <div class="hint">ត្រូវមានយ៉ាងតិច 3 តួ</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ពាក្យសម្ងាត់ <span class="required">*</span></label>
+                        <input type="password" name="password" placeholder="បញ្ចូលពាក្យសម្ងាត់" required>
+                        <div class="hint">ត្រូវមានយ៉ាងតិច 4 តួ</div>
+                    </div>
+                    <div class="form-group">
+                        <label>បញ្ជាក់ពាក្យសម្ងាត់ <span class="required">*</span></label>
+                        <input type="password" name="confirm_password" placeholder="បញ្ចូលម្តងទៀត" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>ឈ្មោះពេញ <span class="required">*</span></label>
+                    <input type="text" name="full_name" placeholder="ឧ: សុខ សុវណ្ណ" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>អ៊ីមែល</label>
+                        <input type="email" name="email" placeholder="sok.sovan@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>លេខទូរស័ព្ទ</label>
+                        <input type="text" name="phone" placeholder="012 345 678">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>តួនាទី</label>
+                    <select name="role">
+                        <option value="user">អ្នកប្រើប្រាស់</option>
+                        <option value="admin">អ្នកគ្រប់គ្រង</option>
+                        <option value="manager">អ្នកគ្រប់គ្រងផ្នែក</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-submit">✅ ចុះឈ្មោះ</button>
+            </form>
+        </div>
+        <div class="footer">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក | រក្សាសិទ្ធិគ្រប់យ៉ាង</div>
+    </div>
+</body>
 </html>'''
 
 CHANGE_PASSWORD_HTML = '''<!DOCTYPE html>
 <html>
-<head><title>ប្តូរពាក្យសម្ងាត់</title><meta charset="UTF-8"></head>
-<body><h2>ប្តូរពាក្យសម្ងាត់</h2></body>
+<head>
+    <title>ប្តូរពាក្យសម្ងាត់</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Khmer OS", Arial, sans-serif; background: #f0f2f5; padding: 15px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { max-width: 500px; width: 100%; margin: 0 auto; }
+        .header {
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header-left h2 { font-size: 18px; font-weight: 600; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .header-right .back-link {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .header-right .back-link:hover { background: rgba(255,255,255,0.35); }
+        .header-right .user-name {
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(255,255,255,0.15);
+        }
+        .form-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .form-container h3 { color: #333; font-size: 20px; margin-bottom: 5px; }
+        .form-container .sub-title { color: #888; font-size: 14px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-weight: 600; color: #555; font-size: 14px; margin-bottom: 5px; }
+        .form-group label .required { color: #dc3545; }
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e8ecf1;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: "Khmer OS", Arial, sans-serif;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #1a73e8;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+        }
+        .form-group .hint { font-size: 12px; color: #aaa; margin-top: 4px; }
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: "Khmer OS", Arial, sans-serif;
+            transition: all 0.3s;
+            margin-top: 5px;
+        }
+        .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26, 115, 232, 0.3); }
+        .btn-submit:active { transform: scale(0.98); }
+        .message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .message.success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+        .message.error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+        .message.warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+        .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
+        @media (max-width: 600px) {
+            .header { flex-direction: column; text-align: center; }
+            .form-container { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h2>🔑 ប្តូរពាក្យសម្ងាត់</h2>
+            </div>
+            <div class="header-right">
+                <span class="user-name">👤 {{ session.username }}</span>
+                <a href="/dashboard" class="back-link">← ត្រលប់</a>
+            </div>
+        </div>
+        {% if message %}
+        <div class="message {{ message_type }}">{{ message }}</div>
+        {% endif %}
+        <div class="form-container">
+            <h3>🔐 ប្តូរពាក្យសម្ងាត់</h3>
+            <div class="sub-title">សូមបញ្ចូលពាក្យសម្ងាត់បច្ចុប្បន្ន និងពាក្យសម្ងាត់ថ្មី</div>
+            <form method="POST">
+                <div class="form-group">
+                    <label>ពាក្យសម្ងាត់បច្ចុប្បន្ន <span class="required">*</span></label>
+                    <input type="password" name="current_password" placeholder="បញ្ចូលពាក្យសម្ងាត់បច្ចុប្បន្ន" required>
+                </div>
+                <div class="form-group">
+                    <label>ពាក្យសម្ងាត់ថ្មី <span class="required">*</span></label>
+                    <input type="password" name="new_password" placeholder="បញ្ចូលពាក្យសម្ងាត់ថ្មី" required>
+                    <div class="hint">ត្រូវមានយ៉ាងតិច 4 តួ</div>
+                </div>
+                <div class="form-group">
+                    <label>បញ្ជាក់ពាក្យសម្ងាត់ថ្មី <span class="required">*</span></label>
+                    <input type="password" name="confirm_password" placeholder="បញ្ចូលម្តងទៀត" required>
+                </div>
+                <button type="submit" class="btn-submit">✅ ប្តូរពាក្យសម្ងាត់</button>
+            </form>
+        </div>
+        <div class="footer">
+            © 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក | រក្សាសិទ្ធិគ្រប់យ៉ាង
+        </div>
+    </div>
+</body>
 </html>'''
 
 USER_MANAGEMENT_HTML = '''<!DOCTYPE html>
 <html>
-<head><title>គ្រប់គ្រងអ្នកប្រើ</title><meta charset="UTF-8"></head>
-<body><h2>គ្រប់គ្រងអ្នកប្រើ</h2></body>
+<head>
+    <title>គ្រប់គ្រងអ្នកប្រើប្រាស់</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; background: #f0f2f5; padding: 15px; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header-left h2 { font-size: 18px; font-weight: 600; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .header-right .back-link {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            transition: all 0.3s;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        }
+        .header-right .back-link:hover { background: rgba(255,255,255,0.35); }
+        .header-right .user-name {
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(255,255,255,0.15);
+        }
+        .message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .message.success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+        .message.error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+        .message.warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow-x: auto;
+        }
+        .table-container .table-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .table-container .table-title .badge-count {
+            background: #1a73e8;
+            color: white;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        table thead th {
+            background: #f8f9fa;
+            color: #555;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 2px solid #e8ecf1;
+        }
+        table tbody td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f2f5;
+            color: #333;
+            font-size: 14px;
+        }
+        table tbody tr:hover { background: #f8f9fa; }
+        .btn-action {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+            margin: 2px;
+        }
+        .btn-edit { background: #1a73e8; color: white; }
+        .btn-edit:hover { background: #1557b0; }
+        .btn-delete { background: #dc3545; color: white; }
+        .btn-delete:hover { background: #b02a37; }
+        .btn-add {
+            background: #34a853;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+            margin-bottom: 15px;
+        }
+        .btn-add:hover { background: #1e7e34; }
+        .btn-setting {
+            background: #ff9800;
+            color: white;
+            padding: 5px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+            margin: 2px;
+        }
+        .btn-setting:hover { background: #e68900; }
+        .btn-setting.active {
+            background: #4caf50;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .role-admin { background: #ffebee; color: #c62828; }
+        .role-manager { background: #fff3e0; color: #e65100; }
+        .role-user { background: #e3f2fd; color: #0d47a1; }
+        .deadline-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #ff9800;
+            color: white;
+        }
+        .deadline-badge.active {
+            background: #4caf50;
+        }
+        .deadline-badge.inactive {
+            background: #9e9e9e;
+        }
+        /* User Lock Badge */
+        .user-lock-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #dc3545;
+            color: white;
+        }
+        .user-lock-badge.unlocked {
+            background: #4caf50;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { color: #333; margin-bottom: 15px; }
+        .modal-content label { display: block; font-weight: 600; color: #555; font-size: 14px; margin-bottom: 5px; }
+        .modal-content input, .modal-content select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e8ecf1;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        }
+        .modal-content input:focus, .modal-content select:focus {
+            outline: none;
+            border-color: #1a73e8;
+        }
+        .modal-content .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .modal-content .btn-group button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+            font-weight: 500;
+        }
+        .btn-save { background: #1a73e8; color: white; }
+        .btn-save:hover { background: #1557b0; }
+        .btn-cancel { background: #e8ecf1; color: #333; }
+        .btn-cancel:hover { background: #d5d8dd; }
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 10px 0;
+        }
+        .toggle-label input[type="checkbox"] {
+            width: 50px;
+            height: 26px;
+            appearance: none;
+            background: #ccc;
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 0;
+        }
+        .toggle-label input[type="checkbox"]:checked {
+            background: #4caf50;
+        }
+        .toggle-label input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: 0.3s;
+        }
+        .toggle-label input[type="checkbox"]:checked::before {
+            left: 26px;
+        }
+        .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; }
+            .header-right { justify-content: center; }
+            table thead th, table tbody td { font-size: 12px; padding: 8px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h2>👤 គ្រប់គ្រងអ្នកប្រើប្រាស់</h2>
+            </div>
+            <div class="header-right">
+                <span class="user-name">👤 {{ session.username }}</span>
+                <a href="/dashboard" class="back-link">← ត្រលប់</a>
+            </div>
+        </div>
+        {% if message %}
+        <div class="message {{ message_type }}">{{ message }}</div>
+        {% endif %}
+        <div class="table-container">
+            <div class="table-title">
+                📋 បញ្ជីអ្នកប្រើប្រាស់
+                <span class="badge-count">{{ users|length }}</span>
+                <button class="btn-add" onclick="openAddUserModal()">➕ បន្ថែមអ្នកប្រើ</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ល.រ</th>
+                        <th>ឈ្មោះអ្នកប្រើ</th>
+                        <th>ឈ្មោះពេញ</th>
+                        <th>អ៊ីមែល</th>
+                        <th>ទូរស័ព្ទ</th>
+                        <th>តួនាទី</th>
+                        <th>ម៉ោងកំណត់</th>
+                        <th>ស្ថានភាព</th>
+                        <th>សកម្មភាព</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    {% set setting = settings.get(user.id) %}
+                    {% set lock = user_locks.get(user.id) %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.full_name }}</td>
+                        <td>{{ user.email or '-' }}</td>
+                        <td>{{ user.phone or '-' }}</td>
+                        <td>
+                            <span class="role-badge
+                                {% if user.role == 'admin' %}role-admin
+                                {% elif user.role == 'manager' %}role-manager
+                                {% else %}role-user{% endif %}">
+                                {{ user.role }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if setting and setting.is_active == 1 %}
+                                <span class="deadline-badge active">⏰ {{ setting.check_in_deadline or 'មិនកំណត់' }}</span>
+                            {% elif setting %}
+                                <span class="deadline-badge inactive">⏰ {{ setting.check_in_deadline or 'មិនកំណត់' }}</span>
+                            {% else %}
+                                <span class="deadline-badge inactive">មិនកំណត់</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if lock and lock.is_locked == 1 %}
+                                <span class="user-lock-badge">🔒 បិទ</span>
+                                {% if lock.auto_unlock_time %}
+                                <br><span style="font-size:10px;color:#888;">បើកនៅ {{ lock.auto_unlock_time }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="user-lock-badge unlocked">🔓 បើក</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn-action btn-edit" onclick="openEditUserModal({{ user.id }})">✏️ កែ</button>
+                            <button class="btn-setting" onclick="openAttendanceSettingModal({{ user.id }}, '{{ user.username }}')">⚙️ ម៉ោង</button>
+                            <button class="btn-action" onclick="toggleUserLock({{ user.id }}, '{{ user.username }}', {% if lock and lock.is_locked == 1 %}true{% else %}false{% endif %})"
+                                    style="background:{% if lock and lock.is_locked == 1 %}#dc3545;color:white{% else %}#4caf50;color:white{% endif %};padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Khmer OS','Khmer OS Muol','Arial',sans-serif;margin:2px;">
+                                {% if lock and lock.is_locked == 1 %}🔓 បើក{% else %}🔒 បិទ{% endif %}
+                            </button>
+                            <button class="btn-action" onclick="resetPassword({{ user.id }}, '{{ user.username }}')" style="background:#fbbc04;color:#333;padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Khmer OS','Khmer OS Muol','Arial',sans-serif;margin:2px;">🔑 ពាក្យសម្ងាត់</button>
+                            {% if user.id != session.user_id %}
+                            <button class="btn-action btn-delete" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">🗑️ លុប</button>
+                            {% else %}
+                            <span style="font-size:11px;color:#999;">(អ្នកចូល)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not users %}
+                    <tr>
+                        <td colspan="9" style="text-align:center;padding:30px;color:#aaa;">📭 មិនមានអ្នកប្រើ</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="footer">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក | រក្សាសិទ្ធិគ្រប់យ៉ាង</div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <h3>✏️ កែប្រែអ្នកប្រើ</h3>
+            <form id="editUserForm">
+                <input type="hidden" id="editUserId">
+                <label>ឈ្មោះអ្នកប្រើ</label>
+                <input type="text" id="editUsername" required>
+                <label>ឈ្មោះពេញ</label>
+                <input type="text" id="editFullName" required>
+                <label>អ៊ីមែល</label>
+                <input type="email" id="editEmail">
+                <label>ទូរស័ព្ទ</label>
+                <input type="text" id="editPhone">
+                <label>តួនាទី</label>
+                <select id="editRole">
+                    <option value="user">អ្នកប្រើប្រាស់</option>
+                    <option value="admin">អ្នកគ្រប់គ្រង</option>
+                    <option value="manager">អ្នកគ្រប់គ្រងផ្នែក</option>
+                </select>
+                <div class="btn-group">
+                    <button type="button" class="btn-save" onclick="submitEditUser()">💾 រក្សាទុក</button>
+                    <button type="button" class="btn-cancel" onclick="closeModal('editUserModal')">បោះបង់</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <h3>➕ បន្ថែមអ្នកប្រើថ្មី</h3>
+            <form id="addUserForm">
+                <label>ឈ្មោះអ្នកប្រើ <span style="color:red;">*</span></label>
+                <input type="text" id="addUsername" required>
+                <label>ពាក្យសម្ងាត់ <span style="color:red;">*</span></label>
+                <input type="password" id="addPassword" required>
+                <label>ឈ្មោះពេញ <span style="color:red;">*</span></label>
+                <input type="text" id="addFullName" required>
+                <label>អ៊ីមែល</label>
+                <input type="email" id="addEmail">
+                <label>ទូរស័ព្ទ</label>
+                <input type="text" id="addPhone">
+                <label>តួនាទី</label>
+                <select id="addRole">
+                    <option value="user">អ្នកប្រើប្រាស់</option>
+                    <option value="admin">អ្នកគ្រប់គ្រង</option>
+                    <option value="manager">អ្នកគ្រប់គ្រងផ្នែក</option>
+                </select>
+                <div class="btn-group">
+                    <button type="button" class="btn-save" onclick="submitAddUser()">✅ បន្ថែម</button>
+                    <button type="button" class="btn-cancel" onclick="closeModal('addUserModal')">បោះបង់</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Attendance Setting Modal -->
+    <div id="attendanceSettingModal" class="modal">
+        <div class="modal-content">
+            <h3>⚙️ កំណត់ម៉ោងចូលធ្វើការ</h3>
+            <p style="color:#666;font-size:14px;margin-bottom:15px;">
+                កំណត់ម៉ោងចុងក្រោយដែលអ្នកប្រើអាចចុចចូលធ្វើការបាន។
+                ប្រសិនបើអ្នកប្រើចុចចូលធ្វើការលើសពីម៉ោងកំណត់ ប្រព័ន្ធនឹងបដិសេធ។
+            </p>
+            <form id="attendanceSettingForm">
+                <input type="hidden" id="settingUserId">
+                <label>ឈ្មោះអ្នកប្រើ</label>
+                <input type="text" id="settingUsername" disabled style="background:#f5f5f5;">
+
+                <div class="toggle-label">
+                    <span>បើក/បិទ ការកំណត់</span>
+                    <input type="checkbox" id="settingIsActive">
+                </div>
+
+                <label>ម៉ោងកំណត់ (HH:MM)</label>
+                <input type="time" id="settingDeadline" step="60">
+                <div style="font-size:12px;color:#888;margin-top:-8px;margin-bottom:10px;">
+                    ឧទាហរណ៍: 08:00 មានន័យថាអ្នកប្រើត្រូវចូលធ្វើការមុនម៉ោង 08:00
+                </div>
+
+                <div class="btn-group">
+                    <button type="button" class="btn-save" onclick="submitAttendanceSetting()">💾 រក្សាទុក</button>
+                    <button type="button" class="btn-cancel" onclick="closeModal('attendanceSettingModal')">បោះបង់</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openEditUserModal(userId) {
+            fetch('/get_user/' + userId)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('editUserId').value = data.id;
+                document.getElementById('editUsername').value = data.username;
+                document.getElementById('editFullName').value = data.full_name;
+                document.getElementById('editEmail').value = data.email || '';
+                document.getElementById('editPhone').value = data.phone || '';
+                document.getElementById('editRole').value = data.role || 'user';
+                openModal('editUserModal');
+            })
+            .catch(err => alert('មានបញ្ហា: ' + err));
+        }
+
+        function submitEditUser() {
+            var id = document.getElementById('editUserId').value;
+            var data = {
+                username: document.getElementById('editUsername').value.trim(),
+                full_name: document.getElementById('editFullName').value.trim(),
+                email: document.getElementById('editEmail').value.trim(),
+                phone: document.getElementById('editPhone').value.trim(),
+                role: document.getElementById('editRole').value
+            };
+            if (!data.username || !data.full_name) {
+                alert('សូមបំពេញឈ្មោះអ្នកប្រើ និងឈ្មោះពេញ!');
+                return;
+            }
+            fetch('/update_user/' + id, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(result => {
+                alert(result.message);
+                if (result.success) {
+                    closeModal('editUserModal');
+                    location.reload();
+                }
+            })
+            .catch(err => alert('មានបញ្ហា: ' + err));
+        }
+
+        function openAddUserModal() {
+            document.getElementById('addUsername').value = '';
+            document.getElementById('addPassword').value = '';
+            document.getElementById('addFullName').value = '';
+            document.getElementById('addEmail').value = '';
+            document.getElementById('addPhone').value = '';
+            document.getElementById('addRole').value = 'user';
+            openModal('addUserModal');
+        }
+
+        function submitAddUser() {
+            var data = {
+                username: document.getElementById('addUsername').value.trim(),
+                password: document.getElementById('addPassword').value.trim(),
+                full_name: document.getElementById('addFullName').value.trim(),
+                email: document.getElementById('addEmail').value.trim(),
+                phone: document.getElementById('addPhone').value.trim(),
+                role: document.getElementById('addRole').value
+            };
+            if (!data.username || !data.password || !data.full_name) {
+                alert('សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!');
+                return;
+            }
+            if (data.password.length < 4) {
+                alert('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!');
+                return;
+            }
+            fetch('/add_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(result => {
+                alert(result.message);
+                if (result.success) {
+                    closeModal('addUserModal');
+                    location.reload();
+                }
+            })
+            .catch(err => alert('មានបញ្ហា: ' + err));
+        }
+
+        function deleteUser(userId, username) {
+            if (!confirm('តើអ្នកចង់លុបអ្នកប្រើ "' + username + '" មែនទេ? (ទិន្នន័យទាំងអស់របស់គាត់នឹងត្រូវលុប!)')) return;
+            fetch('/delete_user/' + userId, { method: 'POST' })
+            .then(res => res.json())
+            .then(result => {
+                alert(result.message);
+                if (result.success) location.reload();
+            })
+            .catch(err => alert('មានបញ្ហា: ' + err));
+        }
+
+        function resetPassword(userId, username) {
+            var newPassword = prompt('សូមបញ្ចូលពាក្យសម្ងាត់ថ្មីសម្រាប់ "' + username + '" (យ៉ាងតិច 4 តួ):');
+            if (newPassword === null) return;
+            if (!newPassword || newPassword.length < 4) {
+                alert('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!');
+                return;
+            }
+            fetch('/admin_reset_password/' + userId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_password: newPassword })
+            })
+            .then(response => response.json())
+            .then(result => {
+                alert(result.message);
+                if (result.success) location.reload();
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('មានបញ្ហា: ' + err);
+            });
+        }
+
+        // ===== USER LOCK FUNCTIONS =====
+        function toggleUserLock(userId, username, isLocked) {
+            var action = isLocked ? 'បើក' : 'បិទ';
+            var confirmMsg = 'តើអ្នកចង់' + action + 'ការចូលធ្វើការរបស់ "' + username + '" មែនទេ?';
+
+            if (!confirm(confirmMsg)) return;
+
+            var autoUnlockTime = null;
+            if (!isLocked) {
+                autoUnlockTime = prompt('សូមបញ្ចូលពេលវេលាបើកដោយស្វ័យប្រវត្តិ (HH:MM) ឬទុកចោលសម្រាប់មិនកំណត់:', '');
+                if (autoUnlockTime !== null && autoUnlockTime !== '') {
+                    var timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+                    if (!timeRegex.test(autoUnlockTime)) {
+                        alert('ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM (ឧទាហរណ៍: 08:00)');
+                        return;
+                    }
+                }
+                if (autoUnlockTime === '') {
+                    autoUnlockTime = null;
+                }
+            }
+
+            var newState = isLocked ? 0 : 1;
+
+            fetch('/toggle_user_lock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userId,
+                    lock_state: newState,
+                    auto_unlock_time: autoUnlockTime
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                alert(result.message);
+                if (result.success) location.reload();
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('មានបញ្ហា: ' + err);
+            });
+        }
+
+        // ===== ATTENDANCE SETTING FUNCTIONS =====
+        function openAttendanceSettingModal(userId, username) {
+            document.getElementById('settingUserId').value = userId;
+            document.getElementById('settingUsername').value = username;
+
+            fetch('/get_attendance_setting/' + userId)
+            .then(res => res.json())
+            .then(data => {
+                if (data.check_in_deadline) {
+                    document.getElementById('settingDeadline').value = data.check_in_deadline;
+                } else {
+                    document.getElementById('settingDeadline').value = '';
+                }
+                document.getElementById('settingIsActive').checked = data.is_active == 1;
+                openModal('attendanceSettingModal');
+            })
+            .catch(err => alert('មានបញ្ហា: ' + err));
+        }
+
+        function submitAttendanceSetting() {
+            var userId = document.getElementById('settingUserId').value;
+            var deadline = document.getElementById('settingDeadline').value;
+            var isActive = document.getElementById('settingIsActive').checked ? 1 : 0;
+
+            if (isActive && !deadline) {
+                alert('សូមបញ្ចូលម៉ោងកំណត់!');
+                return;
+            }
+
+            fetch('/save_attendance_setting', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: parseInt(userId),
+                    check_in_deadline: deadline,
+                    is_active: isActive
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                alert(result.message);
+                if (result.success) {
+                    closeModal('attendanceSettingModal');
+                    location.reload();
+                }
+            })
+            .catch(err => alert('មានបញ្ហា: ' + err));
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('show'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+        document.querySelectorAll('.modal').forEach(function(modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('show');
+            });
+        });
+    </script>
+</body>
 </html>'''
 
 REPORT_HTML = '''<!DOCTYPE html>
 <html>
-<head><title>របាយការណ៍</title><meta charset="UTF-8"></head>
-<body><h2>របាយការណ៍</h2></body>
+<head>
+    <title>របាយការណ៍</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Khmer OS", Arial, sans-serif; background: #f0f2f5; padding: 15px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header-left h2 { font-size: 18px; font-weight: 600; }
+        .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .header-right .back-link {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .header-right .back-link:hover { background: rgba(255,255,255,0.35); }
+        .header-right .user-name {
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(255,255,255,0.15);
+        }
+        .filter-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .filter-box .form-group { flex: 1; min-width: 150px; }
+        .filter-box label { display: block; font-weight: 600; color: #555; font-size: 14px; margin-bottom: 5px; }
+        .filter-box input, .filter-box select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e8ecf1;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: "Khmer OS", Arial, sans-serif;
+        }
+        .filter-box input:focus, .filter-box select:focus { outline: none; border-color: #1a73e8; }
+        .filter-box .btn-filter {
+            padding: 10px 30px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: "Khmer OS", Arial, sans-serif;
+            font-weight: 500;
+            min-width: 120px;
+            transition: all 0.3s;
+        }
+        .filter-box .btn-filter:hover { background: #1557b0; }
+        .filter-box .btn-filter.monthly { background: #34a853; }
+        .filter-box .btn-filter.monthly:hover { background: #1e7e34; }
+        .filter-box .btn-excel {
+            padding: 10px 30px;
+            background: #fbbc04;
+            color: #333;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: "Khmer OS", Arial, sans-serif;
+            font-weight: 500;
+            min-width: 120px;
+            transition: all 0.3s;
+        }
+        .filter-box .btn-excel:hover { background: #e5a800; }
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab-button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: "Khmer OS", Arial, sans-serif;
+            font-weight: 500;
+            background: #e8ecf1;
+            color: #555;
+            transition: all 0.3s;
+        }
+        .tab-button.active {
+            background: #1a73e8;
+            color: white;
+        }
+        .tab-button:hover:not(.active) {
+            background: #d5d8dd;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+        .table-container .table-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .table-container .table-title .badge-count {
+            background: #1a73e8;
+            color: white;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        table thead th {
+            background: #f8f9fa;
+            color: #555;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 2px solid #e8ecf1;
+        }
+        table tbody td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f2f5;
+            color: #333;
+            font-size: 14px;
+        }
+        table tbody tr:hover { background: #f8f9fa; }
+        .rank-badge {
+            display: inline-block;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            text-align: center;
+            line-height: 28px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .rank-1 { background: #ffd700; color: #333; }
+        .rank-2 { background: #c0c0c0; color: #333; }
+        .rank-3 { background: #cd7f32; color: white; }
+        .rank-other { background: #e8ecf1; color: #555; }
+        .shift-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .shift-1 { background: #e3f2fd; color: #0d47a1; }
+        .shift-2 { background: #fff3e0; color: #e65100; }
+        .shift-3 { background: #f3e5f5; color: #4a148c; }
+        .shift-leave { background: #fff3cd; color: #856404; }
+        .shift-mission { background: #d1ecf1; color: #0c5460; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-badge.present { background: #e8f5e9; color: #2e7d32; }
+        .status-badge.outside { background: #ffebee; color: #c62828; }
+        .status-badge.working { background: #fff3cd; color: #856404; }
+        .status-badge.leave { background: #fff3cd; color: #856404; }
+        .status-badge.mission { background: #d1ecf1; color: #0c5460; }
+        .status-badge.approved { background: #d4edda; color: #155724; }
+        .status-badge.pending { background: #fff3cd; color: #856404; }
+        .status-badge.rejected { background: #f8d7da; color: #721c24; }
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 18px 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            text-align: center;
+        }
+        .stat-card .stat-icon { font-size: 28px; display: block; margin-bottom: 4px; }
+        .stat-card .number { font-size: 30px; font-weight: 700; color: #1a73e8; }
+        .stat-card .number.green { color: #34a853; }
+        .stat-card .number.orange { color: #fbbc04; }
+        .stat-card .number.purple { color: #7c3aed; }
+        .stat-card .label { font-size: 13px; color: #888; margin-top: 2px; }
+        .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
+        .info-text { font-size: 12px; color: #666; margin-top: 2px; }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; }
+            .header-right { justify-content: center; }
+            .filter-box { flex-direction: column; }
+            .filter-box .form-group { min-width: 100%; }
+            table thead th, table tbody td { font-size: 12px; padding: 8px 10px; }
+            .tab-buttons { flex-wrap: wrap; }
+            .tab-button { flex: 1; min-width: 100px; text-align: center; padding: 10px 15px; font-size: 14px; }
+            .stats-cards { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left"><h2>📊 របាយការណ៍</h2></div>
+            <div class="header-right">
+                <span class="user-name">👤 {{ session.username }}</span>
+                <a href="/dashboard" class="back-link">← ត្រលប់</a>
+            </div>
+        </div>
+
+        <div class="filter-box">
+            <div class="form-group">
+                <label>ចាប់ពីថ្ងៃ</label>
+                <input type="date" id="startDate" value="{{ start_date }}">
+            </div>
+            <div class="form-group">
+                <label>ដល់ថ្ងៃ</label>
+                <input type="date" id="endDate" value="{{ end_date }}">
+            </div>
+            <div class="form-group">
+                <label>ជ្រើសរើសខែ</label>
+                <select id="monthSelect">
+                    <option value="">-- ជ្រើសរើសខែ --</option>
+                    <option value="1">មករា</option>
+                    <option value="2">កុម្ភៈ</option>
+                    <option value="3">មីនា</option>
+                    <option value="4">មេសា</option>
+                    <option value="5">ឧសភា</option>
+                    <option value="6">មិថុនា</option>
+                    <option value="7">កក្កដា</option>
+                    <option value="8">សីហា</option>
+                    <option value="9">កញ្ញា</option>
+                    <option value="10">តុលា</option>
+                    <option value="11">វិច្ឆិកា</option>
+                    <option value="12">ធ្នូ</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>ឆ្នាំ</label>
+                <input type="number" id="yearSelect" value="{{ current_year }}" min="2020" max="2030">
+            </div>
+            <button class="btn-filter" onclick="filterReport()">🔍 ស្វែងរក</button>
+            <button class="btn-filter monthly" onclick="loadMonthly()">📅 ប្រចាំខែ</button>
+            <button class="btn-excel" onclick="exportExcel()">📥 Excel</button>
+        </div>
+
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="switchTab('daily')">📋 ប្រវត្តិការងារ</button>
+            <button class="tab-button" onclick="switchTab('summary')">📊 សង្ខេបប្រចាំខែ</button>
+        </div>
+
+        <div id="tab-daily" class="tab-content active">
+            <div class="table-container">
+                <div class="table-title">
+                    📋 ប្រវត្តិការងារ
+                    <span class="badge-count">{{ daily|length }}</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ល.រ</th>
+                            <th>ឈ្មោះបុគ្គលិក</th>
+                            <th>កាលបរិច្ឆេទ</th>
+                            <th>ប្រភេទ</th>
+                            <th>វគ្គ</th>
+                            <th>ម៉ោងចូល</th>
+                            <th>ម៉ោងចេញ</th>
+                            <th>ចំនួន</th>
+                            <th>ស្ថានភាព/ព័ត៌មាន</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    {% for item in daily %}
+    <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ item.full_name }}</td>
+        <td>{{ item.date }}</td>
+        <td>
+            {% if item.type == 'attendance' %}
+                <span class="status-badge present">វត្តមាន</span>
+            {% elif item.type == 'leave' %}
+                <span class="status-badge leave">ច្បាប់</span>
+            {% elif item.type == 'mission' %}
+                <span class="status-badge mission">បេសកម្ម</span>
+            {% endif %}
+        </td>
+        <td>
+            {% if item.type == 'attendance' %}
+                <span class="shift-badge shift-{{ item.shift }}">វគ្គ {{ item.shift }}</span>
+            {% elif item.type == 'leave' %}
+                <span class="shift-badge shift-leave">📋 ច្បាប់</span>
+            {% elif item.type == 'mission' %}
+                <span class="shift-badge shift-mission">🚗 បេសកម្ម</span>
+            {% endif %}
+        </td>
+        <td>
+            {% if item.type == 'attendance' %}
+                {% if item.check_in %}
+                    {% if ' ' in item.check_in %}
+                        {{ item.check_in.split(' ')[1][:5] }}
+                    {% else %}
+                        {{ item.check_in[:5] }}
+                    {% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            {% else %}
+                {{ item.start_date or '' }}
+            {% endif %}
+        </td>
+        <td>
+            {% if item.type == 'attendance' %}
+                {% if item.check_out %}
+                    {% if ' ' in item.check_out %}
+                        {{ item.check_out.split(' ')[1][:5] }}
+                    {% else %}
+                        {{ item.check_out[:5] }}
+                    {% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            {% else %}
+                {{ item.end_date or '' }}
+            {% endif %}
+        </td>
+        <td>
+            {% if item.type == 'attendance' %}
+                {% if item.total_hours %}
+                    {% set hours = item.total_hours|int %}
+                    {% set minutes = ((item.total_hours - hours) * 60)|int %}
+                    {{ '%02d' % hours }}:{{ '%02d' % minutes }}
+                {% else %}
+                    -
+                {% endif %}
+            {% elif item.type == 'leave' %}
+                {{ item.days }} ថ្ងៃ
+            {% elif item.type == 'mission' %}
+                {{ item.days }} ថ្ងៃ
+            {% endif %}
+        </td>
+        <td>
+            {% if item.type == 'attendance' %}
+                {% if item.status == 'បានបិទ' %}
+                    <span class="status-badge present">បានបិទ</span>
+                {% elif item.status == 'កំពុងធ្វើការ' %}
+                    <span class="status-badge working">កំពុងធ្វើការ</span>
+                {% else %}
+                    <span class="status-badge outside">មិនទាន់ចូល</span>
+                {% endif %}
+            {% elif item.type == 'leave' %}
+                <span class="status-badge approved">✅ Approved</span>
+                <div class="info-text">មូលហេតុ: {{ item.reason or 'មិនបានបញ្ជាក់' }}</div>
+            {% elif item.type == 'mission' %}
+                <span class="status-badge approved">✅ Approved</span>
+                <div class="info-text">ទីតាំង: {{ item.destination or 'មិនបានបញ្ជាក់' }}</div>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not daily %}
+    <tr>
+        <td colspan="9" style="text-align:center;padding:30px;color:#aaa;">📭 មិនមានទិន្នន័យ</td>
+    </tr>
+    {% endif %}
+</tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-summary" class="tab-content">
+            <div class="table-container">
+                <div class="table-title">
+                    📊 របាយការណ៍សង្ខេបប្រចាំខែ
+                    <span class="badge-count">{{ summary|length }}</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ល.រ</th>
+                            <th>ឈ្មោះបុគ្គលិក</th>
+                            <th>ថ្ងៃធ្វើការ</th>
+                            <th>ម៉ោងធ្វើការសរុប</th>
+                            <th>វគ្គយប់</th>
+                            <th>ម៉ោងយប់</th>
+                            <th>ចំនួនថ្ងៃសុំច្បាប់</th>
+                            <th>ចំនួនថ្ងៃបេសកម្ម</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in summary %}
+                        <tr>
+                            <td>
+                                {% if loop.index == 1 %}<span class="rank-badge rank-1">1</span>
+                                {% elif loop.index == 2 %}<span class="rank-badge rank-2">2</span>
+                                {% elif loop.index == 3 %}<span class="rank-badge rank-3">3</span>
+                                {% else %}<span class="rank-badge rank-other">{{ loop.index }}</span>{% endif %}
+                            </td>
+                            <td>{{ item.full_name }}</td>
+                            <td>{{ item.days_worked or 0 }}</td>
+                            <td>
+                                {% set hours = (item.total_hours or 0)|int %}
+                                {% set minutes = (((item.total_hours or 0) - hours) * 60)|int %}
+                                {{ '%02d' % hours }}:{{ '%02d' % minutes }}
+                            </td>
+                            <td>{{ item.night_shifts or 0 }}</td>
+                            <td>
+                                {% set nhours = (item.night_hours or 0)|int %}
+                                {% set nminutes = (((item.night_hours or 0) - nhours) * 60)|int %}
+                                {{ '%02d' % nhours }}:{{ '%02d' % nminutes }}
+                            </td>
+                            <td>{{ item.total_leave_days or 0 }}</td>
+                            <td>{{ item.total_mission_days or 0 }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not summary %}
+                        <tr>
+                            <td colspan="8" style="text-align:center;padding:30px;color:#aaa;">📭 មិនមានទិន្នន័យ</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <span class="stat-icon">👥</span>
+                    <div class="number">{{ summary|length }}</div>
+                    <div class="label">បុគ្គលិកសរុប</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-icon">📅</span>
+                    <div class="number green">{{ summary|sum(attribute='days_worked') }}</div>
+                    <div class="label">ថ្ងៃធ្វើការសរុប</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-icon">⏱️</span>
+                    <div class="number orange">{{ summary|sum(attribute='total_hours')|round(1) }}</div>
+                    <div class="label">ម៉ោងសរុប</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-icon">🌙</span>
+                    <div class="number purple">{{ summary|sum(attribute='night_shifts') }}</div>
+                    <div class="label">វគ្គយប់សរុប</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក | រក្សាសិទ្ធិគ្រប់យ៉ាង</div>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            var tabs = document.querySelectorAll('.tab-content');
+            var buttons = document.querySelectorAll('.tab-button');
+
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove('active');
+            }
+
+            document.getElementById('tab-' + tab).classList.add('active');
+
+            for (var i = 0; i < buttons.length; i++) {
+                if (buttons[i].getAttribute('onclick') === "switchTab('" + tab + "')") {
+                    buttons[i].classList.add('active');
+                }
+            }
+        }
+
+        function filterReport() {
+            var startDate = document.getElementById('startDate').value;
+            var endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                alert('សូមជ្រើសរើសថ្ងៃ!');
+                return;
+            }
+
+            window.location.href = '/report?start=' + encodeURIComponent(startDate) + '&end=' + encodeURIComponent(endDate);
+        }
+
+        function loadMonthly() {
+            var month = document.getElementById('monthSelect').value;
+            var year = document.getElementById('yearSelect').value;
+
+            if (!month) {
+                alert('សូមជ្រើសរើសខែ!');
+                return;
+            }
+
+            if (!year) {
+                year = new Date().getFullYear();
+            }
+
+            window.location.href = '/report?month=' + encodeURIComponent(month) + '&year=' + encodeURIComponent(year);
+        }
+
+        function exportExcel() {
+            var startDate = document.getElementById('startDate').value;
+            var endDate = document.getElementById('endDate').value;
+            var month = document.getElementById('monthSelect').value;
+            var year = document.getElementById('yearSelect').value;
+
+            var url = '/export_excel?';
+
+            if (month && year) {
+                url += 'month=' + encodeURIComponent(month) + '&year=' + encodeURIComponent(year);
+            } else if (startDate && endDate) {
+                url += 'start=' + encodeURIComponent(startDate) + '&end=' + encodeURIComponent(endDate);
+            } else {
+                alert('សូមជ្រើសរើសថ្ងៃខែមុនពេលទាញ Excel!');
+                return;
+            }
+
+            window.open(url, '_blank');
+        }
+
+        function setDefaultDates() {
+            var startDate = document.getElementById('startDate');
+            var endDate = document.getElementById('endDate');
+
+            if (startDate && !startDate.value) {
+                var today = new Date();
+                var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                startDate.value = firstDay.toISOString().split('T')[0];
+            }
+            if (endDate && !endDate.value) {
+                var today = new Date();
+                endDate.value = today.toISOString().split('T')[0];
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setDefaultDates();
+        });
+
+        window.onload = function() {
+            setDefaultDates();
+        };
+    </script>
+</body>
 </html>'''
 
 # ============================================================
@@ -3906,5 +6716,4 @@ REPORT_HTML = '''<!DOCTYPE html>
 
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
