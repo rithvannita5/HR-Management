@@ -205,10 +205,6 @@ def save_uploaded_file(file, user_id, folder_type):
 # ROUTES
 # ============================================================
 
-# ============================================================
-# ROUTES
-# ============================================================
-
 @app.route('/')
 def home():
     if not session.get('logged_in'):
@@ -3472,264 +3468,332 @@ USER_MANAGEMENT_HTML = '''<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; background: #f0f2f5; padding: 15px; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header {
-            background: linear-gradient(135deg, #1a73e8, #0d47a1);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .header-left h2 { font-size: 18px; font-weight: 600; }
-        .header-right { display: flex; align-items: center; gap: 10px; }
-        .header-right .back-link {
-            color: white;
-            text-decoration: none;
-            background: rgba(255,255,255,0.2);
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            transition: all 0.3s;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-        }
-        .header-right .back-link:hover { background: rgba(255,255,255,0.35); }
-        .header-right .user-name {
-            color: white;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            background: rgba(255,255,255,0.15);
-        }
-        .message {
-            padding: 12px 16px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        .message.success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
-        .message.error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
-        .message.warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
-        .table-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            overflow-x: auto;
-        }
-        .table-container .table-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .table-container .table-title .badge-count {
-            background: #1a73e8;
-            color: white;
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        table thead th {
-            background: #f8f9fa;
-            color: #555;
-            padding: 12px 15px;
-            text-align: left;
-            font-size: 13px;
-            font-weight: 600;
-            border-bottom: 2px solid #e8ecf1;
-        }
-        table tbody td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #f0f2f5;
-            color: #333;
-            font-size: 14px;
-        }
-        table tbody tr:hover { background: #f8f9fa; }
-        .btn-action {
-            padding: 5px 12px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            margin: 2px;
-        }
-        .btn-edit { background: #1a73e8; color: white; }
-        .btn-edit:hover { background: #1557b0; }
-        .btn-delete { background: #dc3545; color: white; }
-        .btn-delete:hover { background: #b02a37; }
-        .btn-add {
-            background: #34a853;
-            color: white;
-            padding: 8px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            margin-bottom: 15px;
-        }
-        .btn-add:hover { background: #1e7e34; }
-        .btn-setting {
-            background: #ff9800;
-            color: white;
-            padding: 5px 12px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            margin: 2px;
-        }
-        .btn-setting:hover { background: #e68900; }
-        .btn-setting.active {
-            background: #4caf50;
-        }
-        .role-badge {
-            display: inline-block;
-            padding: 3px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .role-admin { background: #ffebee; color: #c62828; }
-        .role-manager { background: #fff3e0; color: #e65100; }
-        .role-user { background: #e3f2fd; color: #0d47a1; }
-        .deadline-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            background: #ff9800;
-            color: white;
-        }
-        .deadline-badge.active {
-            background: #4caf50;
-        }
-        .deadline-badge.inactive {
-            background: #9e9e9e;
-        }
-        .user-lock-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            background: #dc3545;
-            color: white;
-        }
-        .user-lock-badge.unlocked {
-            background: #4caf50;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-        }
-        .modal.show { display: flex; }
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 16px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .modal-content h3 { color: #333; margin-bottom: 15px; }
-        .modal-content label { display: block; font-weight: 600; color: #555; font-size: 14px; margin-bottom: 5px; }
-        .modal-content input, .modal-content select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 2px solid #e8ecf1;
-            border-radius: 10px;
-            font-size: 14px;
-            margin-bottom: 12px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-        }
-        .modal-content input:focus, .modal-content select:focus {
-            outline: none;
-            border-color: #1a73e8;
-        }
-        .modal-content .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .modal-content .btn-group button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 15px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            font-weight: 500;
-        }
-        .btn-save { background: #1a73e8; color: white; }
-        .btn-save:hover { background: #1557b0; }
-        .btn-cancel { background: #e8ecf1; color: #333; }
-        .btn-cancel:hover { background: #d5d8dd; }
-        .toggle-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            padding: 10px 0;
-        }
-        .toggle-label input[type="checkbox"] {
-            width: 50px;
-            height: 26px;
-            appearance: none;
-            background: #ccc;
-            border-radius: 13px;
-            position: relative;
-            cursor: pointer;
-            transition: 0.3s;
-            margin: 0;
-        }
-        .toggle-label input[type="checkbox"]:checked {
-            background: #4caf50;
-        }
-        .toggle-label input[type="checkbox"]::before {
-            content: '';
-            position: absolute;
-            width: 22px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            top: 2px;
-            left: 2px;
-            transition: 0.3s;
-        }
-        .toggle-label input[type="checkbox"]:checked::before {
-            left: 26px;
-        }
-        .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
-        @media (max-width: 768px) {
-            .header { flex-direction: column; text-align: center; }
-            .header-right { justify-content: center; }
-            table thead th, table tbody td { font-size: 12px; padding: 8px 10px; }
-        }
-    </style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; 
+        background: #f0f2f5; 
+        padding: 15px; 
+        margin: 0; 
+        min-height: 100vh; 
+    }
+    .container { 
+        max-width: 1400px; 
+        margin: 0 auto; 
+        padding: 0 10px;
+    }
+    .header {
+        background: linear-gradient(135deg, #1a73e8, #0d47a1);
+        color: white;
+        padding: 12px 25px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .header-left h2 { font-size: 18px; font-weight: 600; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .header-right .back-link {
+        color: white;
+        text-decoration: none;
+        background: rgba(255,255,255,0.2);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        transition: all 0.3s;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+    }
+    .header-right .back-link:hover { background: rgba(255,255,255,0.35); }
+    .header-right .user-name {
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        background: rgba(255,255,255,0.15);
+    }
+    .message {
+        padding: 12px 16px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        font-size: 14px;
+    }
+    .message.success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+    .message.error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+    .message.warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        overflow-x: auto;
+    }
+    .table-container .table-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .table-container .table-title .badge-count {
+        background: #1a73e8;
+        color: white;
+        padding: 2px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+    }
+    .btn-add {
+        background: #34a853;
+        color: white;
+        padding: 8px 20px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        margin-left: auto;
+        transition: all 0.3s;
+    }
+    .btn-add:hover { background: #1e7e34; transform: scale(1.02); }
+    table { width: 100%; border-collapse: collapse; }
+    table thead th {
+        background: #f8f9fa;
+        color: #555;
+        padding: 12px 15px;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        border-bottom: 2px solid #e8ecf1;
+        white-space: nowrap;
+    }
+    table tbody td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f0f2f5;
+        color: #333;
+        font-size: 14px;
+        vertical-align: middle;
+    }
+    table tbody tr:hover { background: #f8f9fa; }
+    .role-badge {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .role-admin { background: #ffebee; color: #c62828; }
+    .role-manager { background: #fff3e0; color: #e65100; }
+    .role-user { background: #e3f2fd; color: #0d47a1; }
+    .deadline-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #ff9800;
+        color: white;
+    }
+    .deadline-badge.active { background: #4caf50; }
+    .deadline-badge.inactive { background: #9e9e9e; }
+    .user-lock-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #dc3545;
+        color: white;
+    }
+    .user-lock-badge.unlocked { background: #4caf50; }
+    .btn-action {
+        padding: 4px 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        margin: 2px;
+        transition: all 0.3s;
+        display: inline-block;
+    }
+    .btn-action:hover { transform: scale(1.05); }
+    .btn-edit { background: #1a73e8; color: white; }
+    .btn-edit:hover { background: #1557b0; }
+    .btn-delete { background: #dc3545; color: white; }
+    .btn-delete:hover { background: #b02a37; }
+    .btn-setting {
+        background: #ff9800;
+        color: white;
+        padding: 4px 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        margin: 2px;
+        transition: all 0.3s;
+    }
+    .btn-setting:hover { background: #e68900; transform: scale(1.05); }
+    .btn-lock {
+        padding: 4px 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        margin: 2px;
+        transition: all 0.3s;
+        color: white;
+    }
+    .btn-lock:hover { transform: scale(1.05); }
+    .btn-reset {
+        background: #fbbc04;
+        color: #333;
+        padding: 4px 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        margin: 2px;
+        transition: all 0.3s;
+    }
+    .btn-reset:hover { background: #e5a800; transform: scale(1.05); }
+    .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+        animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 16px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-content h3 { color: #333; margin-bottom: 15px; font-size: 20px; }
+    .modal-content label {
+        display: block;
+        font-weight: 600;
+        color: #555;
+        font-size: 14px;
+        margin-bottom: 5px;
+        margin-top: 10px;
+    }
+    .modal-content input, .modal-content select {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid #e8ecf1;
+        border-radius: 10px;
+        font-size: 14px;
+        margin-bottom: 5px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        transition: all 0.3s;
+    }
+    .modal-content input:focus, .modal-content select:focus {
+        outline: none;
+        border-color: #1a73e8;
+        box-shadow: 0 0 0 3px rgba(26,115,232,0.1);
+    }
+    .modal-content .btn-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    .modal-content .btn-group button {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 15px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+    .modal-content .btn-group button:hover { transform: scale(1.02); }
+    .btn-save { background: #1a73e8; color: white; }
+    .btn-save:hover { background: #1557b0; }
+    .btn-cancel { background: #e8ecf1; color: #333; }
+    .btn-cancel:hover { background: #d5d8dd; }
+    .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        padding: 10px 0;
+    }
+    .toggle-label input[type="checkbox"] {
+        width: 50px;
+        height: 26px;
+        appearance: none;
+        background: #ccc;
+        border-radius: 13px;
+        position: relative;
+        cursor: pointer;
+        transition: 0.3s;
+        margin: 0;
+        flex-shrink: 0;
+    }
+    .toggle-label input[type="checkbox"]:checked { background: #4caf50; }
+    .toggle-label input[type="checkbox"]::before {
+        content: '';
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        background: white;
+        border-radius: 50%;
+        top: 2px;
+        left: 2px;
+        transition: 0.3s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-label input[type="checkbox"]:checked::before { left: 26px; }
+    .toggle-label span { font-size: 14px; color: #555; }
+
+    @media (max-width: 900px) {
+        .header { flex-direction: column; text-align: center; }
+        .header-right { justify-content: center; flex-wrap: wrap; }
+        .table-container .table-title { flex-wrap: wrap; }
+        .btn-add { margin-left: 0; }
+    }
+    @media (max-width: 768px) {
+        table thead th, table tbody td { font-size: 12px; padding: 8px 10px; }
+        .modal-content { padding: 20px; }
+        .header-right .back-link { font-size: 12px; padding: 4px 12px; }
+    }
+    @media (max-width: 600px) {
+        body { padding: 10px; }
+        .container { padding: 0 5px; }
+        table thead th, table tbody td { font-size: 11px; padding: 6px 8px; }
+        .btn-action, .btn-setting, .btn-lock, .btn-reset { font-size: 10px; padding: 3px 6px; }
+        .modal-content { padding: 15px; }
+    }
+</style>
 </head>
 <body>
     <div class="container">
