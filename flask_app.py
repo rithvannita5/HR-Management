@@ -205,6 +205,10 @@ def save_uploaded_file(file, user_id, folder_type):
 # ROUTES
 # ============================================================
 
+# ============================================================
+# ROUTES
+# ============================================================
+
 @app.route('/')
 def home():
     if not session.get('logged_in'):
@@ -248,6 +252,116 @@ def dashboard():
                                    lock_status=lock_status,
                                    user_lock=user_lock)
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = get_user_by_username(username)
+        if user and user['password'] == password:
+            session['logged_in'] = True
+            session['username'] = username
+            session['user_id'] = str(user['_id'])
+            session['role'] = user['role']
+            session['full_name'] = user['full_name']
+            return redirect(url_for('dashboard'))
+        else:
+            return '''
+            <!DOCTYPE html>
+            <html>
+            <head><title>កំហុស</title><meta charset="UTF-8">
+            <style>
+                body { font-family:'Khmer OS',Arial; text-align:center; padding:50px; background:#f0f2f5; }
+                .box { background:white; padding:40px; border-radius:16px; max-width:400px; margin:0 auto; box-shadow:0 4px 20px rgba(0,0,0,0.08); }
+                h3 { color:#dc3545; }
+                .back-link { display:inline-block; margin-top:20px; color:#1a73e8; text-decoration:none; padding:10px 25px; border:2px solid #1a73e8; border-radius:10px; }
+                .back-link:hover { background:#1a73e8; color:white; }
+            </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h3>❌ ឈ្មោះអ្នកប្រើ ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ!</h3>
+                    <a href="/login" class="back-link">← ត្រលប់មកវិញ</a>
+                </div>
+            </body>
+            </html>
+            '''
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ចូលប្រើប្រព័ន្ធ</title>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HR System">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; font-family: 'Khmer OS', Arial, sans-serif; background: #ffffff; margin: 0; padding: 0; overflow: hidden; }
+        .login-container { display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; padding: 15px; background: #ffffff; }
+        .login-box { width: 100%; height: 100%; max-width: 480px; max-height: 600px; background: #ffffff; padding: 40px 30px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; display: flex; flex-direction: column; justify-content: center; animation: fadeInUp 0.5s ease; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .logo-icon { text-align: center; font-size: 65px; margin-bottom: 8px; }
+        .login-box h2 { text-align: center; color: #1a1a2e; font-size: 30px; font-weight: 700; margin-bottom: 4px; }
+        .login-box .sub-title { text-align: center; color: #888; font-size: 15px; margin-bottom: 28px; }
+        .login-box .form-group { margin-bottom: 16px; }
+        .login-box input { width: 100%; padding: 16px 18px; border: 2px solid #e8ecf1; border-radius: 14px; font-size: 17px; box-sizing: border-box; font-family: 'Khmer OS', Arial, sans-serif; transition: all 0.3s; background: #f8f9fa; }
+        .login-box input:focus { outline: none; border-color: #1a73e8; background: white; box-shadow: 0 0 0 4px rgba(26,115,232,0.08); }
+        .login-box button { width: 100%; padding: 16px; background: #1a73e8; color: white; border: none; border-radius: 14px; font-size: 18px; cursor: pointer; font-family: 'Khmer OS', Arial, sans-serif; font-weight: 600; transition: all 0.3s; margin-top: 4px; }
+        .login-box button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(26,115,232,0.35); }
+        .login-box button:active { transform: scale(0.98); }
+        .login-box .hint { text-align: center; margin-top: 16px; color: #999; font-size: 13px; }
+        .login-box .hint b { color: #1a73e8; }
+        .login-box .footer-text { text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid #eee; color: #ccc; font-size: 12px; }
+        @media (max-width: 600px) { .login-box { padding: 30px 22px; border-radius: 18px; max-height: none; } .login-box h2 { font-size: 26px; } .login-box input { padding: 15px 16px; font-size: 16px; } .login-box button { padding: 15px; font-size: 17px; } .logo-icon { font-size: 55px; } }
+        @media (max-width: 400px) { .login-container { padding: 10px; } .login-box { padding: 22px 16px; border-radius: 14px; } .login-box h2 { font-size: 22px; } .login-box input { padding: 13px 14px; font-size: 15px; } .login-box button { padding: 13px; font-size: 16px; } .logo-icon { font-size: 45px; } .login-box .sub-title { font-size: 13px; margin-bottom: 20px; } }
+        @media (max-height: 600px) { .login-box { padding: 20px 20px; } .logo-icon { font-size: 40px; margin-bottom: 4px; } .login-box h2 { font-size: 22px; margin-bottom: 2px; } .login-box .sub-title { font-size: 13px; margin-bottom: 16px; } .login-box .form-group { margin-bottom: 10px; } .login-box input { padding: 12px 14px; font-size: 15px; } .login-box button { padding: 12px; font-size: 16px; } .login-box .hint { margin-top: 10px; font-size: 12px; } .login-box .footer-text { margin-top: 12px; padding-top: 10px; font-size: 11px; } }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo-icon">🏢</div>
+            <h2 style="font-family: 'Khmer', 'Khmer OS Muol Light', 'Khmer OS', Arial, sans-serif; font-weight: 300; color: #1a73e8;">ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</h2>
+            <div class="sub-title">សូមបញ្ចូលឈ្មោះ និងពាក្យសម្ងាត់</div>
+            <form method="POST" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                <div class="form-group"><input type="text" name="username" placeholder="ឈ្មោះអ្នកប្រើ" required></div>
+                <div class="form-group"><input type="password" name="password" placeholder="ពាក្យសម្ងាត់" required></div>
+                <button type="submit">🔐 Login</button>
+            </form>
+            <div class="hint"><b>ពត៌មានបន្ថែមៈ ទំនាក់ទំនងលោក YEN SONY</b></div>
+            <div class="hint"><b>ទូរស័ព្ទ៖ +855 92 740 067</b></div>
+            <div class="footer-text">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</div>
+        </div>
+    </div>
+    <script>
+        let deferredPrompt;
+        const installBtn = document.createElement('button');
+        installBtn.id = 'pwaInstallBtn';
+        installBtn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#34a853;color:white;border:none;border-radius:50px;padding:14px 30px;font-size:16px;font-family:"Khmer OS",Arial,sans-serif;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(52,168,83,0.4);z-index:9999;display:none;animation:slideUp 0.5s ease;';
+        installBtn.innerHTML = '📲 ដំឡើងកម្មវិធី';
+        document.body.appendChild(installBtn);
+        const stylePwa = document.createElement('style');
+        stylePwa.textContent = '@keyframes slideUp { from { transform: translateX(-50%) translateY(100px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }';
+        document.head.appendChild(stylePwa);
+        window.addEventListener('beforeinstallprompt', function(e) { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'block'; });
+        installBtn.addEventListener('click', function() { if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(function(choiceResult) { if (choiceResult.outcome === 'accepted') { installBtn.style.display = 'none'; } deferredPrompt = null; }); } });
+        window.addEventListener('appinstalled', function() { installBtn.style.display = 'none'; });
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js').then(function(reg) { console.log('Service Worker registered'); }).catch(function(err) { console.log('Service Worker registration failed:', err); }); }
+        if (window.matchMedia('(display-mode: standalone)').matches) { installBtn.style.display = 'none'; }
+    </script>
+</body>
+</html>
+'''
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/get_data_version')
 def get_data_version_route():
     if not session.get('logged_in'):
@@ -286,7 +400,132 @@ def toggle_system_lock_route():
         return jsonify({'success': True, 'message': f'✅ បាន{status}ប្រព័ន្ធចូលធ្វើការជោគជ័យ!'})
     return jsonify({'success': False, 'message': '❌ មិនអាចប្តូរស្ថានភាពបាន!'})
 
-@app.route('/get_user_lock/<int:user_id>')
+# ============================================================
+# USER MANAGEMENT ROUTES
+# ============================================================
+
+@app.route('/get_user/<user_id>')
+def get_user(user_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    return jsonify({
+        'id': str(user['_id']),
+        'username': user['username'],
+        'full_name': user['full_name'],
+        'email': user.get('email') or '',
+        'phone': user.get('phone') or '',
+        'role': user.get('role')
+    })
+
+@app.route('/update_user/<user_id>', methods=['POST'])
+def update_user_route(user_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
+    result = update_user(user_id, data.get('username'), data.get('full_name'), data.get('email'), data.get('phone'), data.get('role'))
+    if result:
+        return jsonify({'success': True, 'message': '✅ កែប្រែអ្នកប្រើជោគជ័យ!'})
+    return jsonify({'success': False, 'message': '❌ ឈ្មោះអ្នកប្រើមានរួចហើយ!'})
+
+@app.route('/add_user', methods=['POST'])
+def add_user_route():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
+    if create_user(data.get('username'), data.get('password'), data.get('full_name'), data.get('email'), data.get('phone'), data.get('role')):
+        return jsonify({'success': True, 'message': f'✅ បានបន្ថែមអ្នកប្រើ "{data.get("username")}" ជោគជ័យ!'})
+    return jsonify({'success': False, 'message': '❌ ឈ្មោះអ្នកប្រើមានរួចហើយ!'})
+
+@app.route('/delete_user/<user_id>', methods=['POST'])
+def delete_user_route(user_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    if str(user_id) == str(session.get('user_id')):
+        return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចលុបគណនីរបស់ខ្លួនឯងបានទេ!'})
+    if delete_user(user_id):
+        return jsonify({'success': True, 'message': '✅ លុបអ្នកប្រើជោគជ័យ!'})
+    return jsonify({'success': False, 'message': '❌ មិនអាចលុបបាន!'})
+
+@app.route('/admin_reset_password/<user_id>', methods=['POST'])
+def admin_reset_password(user_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
+    new_password = data.get('new_password')
+    if not new_password or len(new_password) < 4:
+        return jsonify({'success': False, 'message': 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!'})
+    if update_password(user_id, new_password):
+        return jsonify({'success': True, 'message': '✅ បានកំណត់ពាក្យសម្ងាត់ថ្មីជោគជ័យ!'})
+    return jsonify({'success': False, 'message': '❌ មិនអាចកំណត់ពាក្យសម្ងាត់បាន!'})
+
+@app.route('/get_attendance_setting/<user_id>')
+def get_attendance_setting_route(user_id):
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    setting = get_attendance_setting(user_id)
+    if setting:
+        return jsonify(setting)
+    return jsonify({'user_id': user_id, 'check_in_deadline': '', 'is_active': 0})
+
+@app.route('/save_attendance_setting', methods=['POST'])
+def save_attendance_setting_route():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
+    user_id = data.get('user_id')
+    check_in_deadline = data.get('check_in_deadline', '').strip()
+    is_active = data.get('is_active', 0)
+    if not user_id:
+        return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
+    if check_in_deadline:
+        try:
+            datetime.strptime(check_in_deadline, '%H:%M')
+        except ValueError:
+            return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM (ឧទាហរណ៍: 08:00)'})
+    result = save_attendance_setting(user_id, check_in_deadline, int(is_active))
+    if result:
+        return jsonify({'success': True, 'message': '✅ រក្សាទុកការកំណត់ជោគជ័យ!'})
+    return jsonify({'success': False, 'message': '❌ មិនអាចរក្សាទុកបាន!'})
+
+@app.route('/toggle_user_lock', methods=['POST'])
+def toggle_user_lock_route():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
+    user_id = data.get('user_id')
+    lock_state = data.get('lock_state', 0)
+    auto_unlock_time = data.get('auto_unlock_time', '')
+    admin_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
+    if auto_unlock_time:
+        try:
+            datetime.strptime(auto_unlock_time, '%H:%M')
+        except ValueError:
+            return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM'})
+    if str(user_id) == str(admin_id):
+        return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចបិទគណនីរបស់ខ្លួនឯងបានទេ!'})
+    result = toggle_user_lock(user_id, lock_state, auto_unlock_time if auto_unlock_time else None, admin_id)
+    if result:
+        user = get_user_by_id(user_id)
+        status = "បិទ" if lock_state == 1 else "បើក"
+        return jsonify({'success': True, 'message': f'✅ បាន{status}ការចូលធ្វើការរបស់ {user["full_name"]} ជោគជ័យ!'})
+    return jsonify({'success': False, 'message': '❌ មិនអាចប្តូរស្ថានភាពបាន!'})
+
+@app.route('/get_user_lock/<user_id>')
 def get_user_lock_route(user_id):
     if not session.get('logged_in') or session.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
@@ -299,6 +538,10 @@ def get_all_user_locks_route():
         return jsonify([]), 403
     locks = get_all_user_lock_status()
     return jsonify(locks)
+
+# ============================================================
+# CHECK IN / CHECK OUT ROUTES
+# ============================================================
 
 @app.route('/check_in', methods=['POST'])
 def check_in_route():
@@ -417,250 +660,8 @@ def save_location():
     return jsonify({'success': False, 'message': 'មិនអាចរក្សាទុកបាន'})
 
 # ============================================================
-# USER MANAGEMENT ROUTES (បន្ថែមនៅទីនេះ)
+# LEAVE, MISSION, REQUEST ROUTES
 # ============================================================
-
-   
-    user = get_user_by_id(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    return jsonify({
-        'id': str(user['_id']),
-        'username': user['username'],
-        'full_name': user['full_name'],
-        'email': user.get('email') or '',
-        'phone': user.get('phone') or '',
-        'role': user.get('role')
-    })
-
-   
-    data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
-    
-    result = update_user(
-        user_id,
-        data.get('username'),
-        data.get('full_name'),
-        data.get('email'),
-        data.get('phone'),
-        data.get('role')
-    )
-    
-    if result:
-        return jsonify({'success': True, 'message': '✅ កែប្រែអ្នកប្រើជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ ឈ្មោះអ្នកប្រើមានរួចហើយ!'})
-
-@app.route('/add_user', methods=['POST'])
-def add_user_route():
-    """Add new user"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
-    
-    username = data.get('username')
-    password = data.get('password')
-    full_name = data.get('full_name')
-    email = data.get('email')
-    phone = data.get('phone')
-    role = data.get('role', 'user')
-    
-    if not username or not password or not full_name:
-        return jsonify({'success': False, 'message': 'សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!'})
-    
-    if len(password) < 4:
-        return jsonify({'success': False, 'message': 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!'})
-    
-    if create_user(username, password, full_name, email, phone, role):
-        return jsonify({'success': True, 'message': f'✅ បានបន្ថែមអ្នកប្រើ "{username}" ជោគជ័យ!'})
-    return jsonify({'success': False, 'message': f'❌ ឈ្មោះអ្នកប្រើ "{username}" មានរួចហើយ!'})
-
-   
-    data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
-    
-    new_password = data.get('new_password')
-    if not new_password or len(new_password) < 4:
-        return jsonify({'success': False, 'message': 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!'})
-    
-    if update_password(user_id, new_password):
-        return jsonify({'success': True, 'message': '✅ បានកំណត់ពាក្យសម្ងាត់ថ្មីជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចកំណត់ពាក្យសម្ងាត់បាន!'})
-
-@app.route('/toggle_user_lock', methods=['POST'])
-def toggle_user_lock_route():
-    """Toggle user lock status"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
-    
-    user_id = data.get('user_id')
-    lock_state = data.get('lock_state', 0)
-    auto_unlock_time = data.get('auto_unlock_time', '')
-    admin_id = session.get('user_id')
-    
-    if not user_id:
-        return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
-    
-    if auto_unlock_time:
-        try:
-            datetime.strptime(auto_unlock_time, '%H:%M')
-        except ValueError:
-            return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM'})
-    
-    if str(user_id) == str(admin_id):
-        return jsonify({'success': False, 'message': '❌ អ្នកមិនអាចបិទគណនីរបស់ខ្លួនឯងបានទេ!'})
-    
-    result = toggle_user_lock(user_id, lock_state, auto_unlock_time if auto_unlock_time else None, admin_id)
-    if result:
-        user = get_user_by_id(user_id)
-        status = "បិទ" if lock_state == 1 else "បើក"
-        return jsonify({'success': True, 'message': f'✅ បាន{status}ការចូលធ្វើការរបស់ {user["full_name"]} ជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចប្តូរស្ថានភាពបាន!'})
-    
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return redirect(url_for('dashboard'))
-    message = ''
-    message_type = ''
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        full_name = request.form.get('full_name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        role = request.form.get('role')
-        if not username or not password or not full_name:
-            message = 'សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!'
-            message_type = 'error'
-        elif password != confirm_password:
-            message = 'ពាក្យសម្ងាត់មិនត្រូវគ្នា!'
-            message_type = 'error'
-        elif len(password) < 4:
-            message = 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!'
-            message_type = 'error'
-        else:
-            if create_user(username, password, full_name, email, phone, role):
-                message = f'✅ ចុះឈ្មោះអ្នកប្រើ "{username}" ជោគជ័យ!'
-                message_type = 'success'
-            else:
-                message = f'❌ ឈ្មោះអ្នកប្រើ "{username}" មានរួចហើយ!'
-                message_type = 'error'
-    return render_template_string(REGISTER_HTML, session=session, message=message, message_type=message_type)
-
-@app.route('/manage_users')
-def manage_users():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return redirect(url_for('dashboard'))
-    users = get_all_users()
-    for user in users:
-        user['id'] = str(user['_id'])
-    settings = get_all_attendance_settings()
-    settings_dict = {str(s.get('user_id')): s for s in settings}
-    user_locks = get_all_user_lock_status()
-    user_locks_dict = {str(u.get('id')): u for u in user_locks}
-    return render_template_string(USER_MANAGEMENT_HTML,
-                                   session=session,
-                                   users=users,
-                                   settings=settings_dict,
-                                   user_locks=user_locks_dict,
-                                   message='',
-                                   message_type='')
-
-@app.route('/save_attendance_setting', methods=['POST'])
-def save_attendance_setting_route():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    data = request.get_json()
-    user_id = data.get('user_id')
-    check_in_deadline = data.get('check_in_deadline', '').strip()
-    is_active = data.get('is_active', 0)
-    if not user_id:
-        return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
-    if check_in_deadline:
-        try:
-            datetime.strptime(check_in_deadline, '%H:%M')
-        except ValueError:
-            return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM (ឧទាហរណ៍: 08:00)'})
-    result = save_attendance_setting(user_id, check_in_deadline, int(is_active))
-    if result:
-        return jsonify({'success': True, 'message': '✅ រក្សាទុកការកំណត់ជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចរក្សាទុកបាន!'})
-
-@app.route('/add_user', methods=['POST'])
-def add_user_route():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    data = request.get_json()
-    if create_user(data.get('username'), data.get('password'), data.get('full_name'), data.get('email'), data.get('phone'), data.get('role')):
-        return jsonify({'success': True, 'message': f'✅ បានបន្ថែមអ្នកប្រើ "{data.get("username")}" ជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ ឈ្មោះអ្នកប្រើមានរួចហើយ!'})
-
-@app.route('/change_password', methods=['GET', 'POST'])
-def change_password():
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
-    message = ''
-    message_type = ''
-    user_id = session.get('user_id')
-    if request.method == 'POST':
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-        if not current_password or not new_password or not confirm_password:
-            message = 'សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!'
-            message_type = 'error'
-        elif new_password != confirm_password:
-            message = 'ពាក្យសម្ងាត់ថ្មីមិនត្រូវគ្នា!'
-            message_type = 'error'
-        elif len(new_password) < 4:
-            message = 'ពាក្យសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច 4 តួ!'
-            message_type = 'error'
-        elif not verify_password(user_id, current_password):
-            message = 'ពាក្យសម្ងាត់បច្ចុប្បន្នមិនត្រឹមត្រូវ!'
-            message_type = 'error'
-        else:
-            if update_password(user_id, new_password):
-                message = '✅ បានប្តូរពាក្យសម្ងាត់ជោគជ័យ!'
-                message_type = 'success'
-            else:
-                message = '❌ មិនអាចប្តូរពាក្យសម្ងាត់បាន!'
-                message_type = 'error'
-    return render_template_string(CHANGE_PASSWORD_HTML, session=session, message=message, message_type=message_type)
-
-@app.route('/clean_data', methods=['POST'])
-def clean_data():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    data = request.get_json()
-    clean_type = data.get('type', 'all')
-    if clean_type == 'all':
-        result = clean_all_data()
-        message = '✅ បានសម្អាតទិន្នន័យទាំងអស់ជោគជ័យ!'
-    elif clean_type == 'attendance':
-        result = clean_attendance_only()
-        message = '✅ បានសម្អាតទិន្នន័យវត្តមានជោគជ័យ!'
-    elif clean_type == 'leaves':
-        result = clean_leaves_only()
-        message = '✅ បានសម្អាតទិន្នន័យសុំច្បាប់ជោគជ័យ!'
-    elif clean_type == 'missions':
-        result = clean_missions_only()
-        message = '✅ បានសម្អាតទិន្នន័យបេសកម្មជោគជ័យ!'
-    else:
-        return jsonify({'success': False, 'message': 'ប្រភេទមិនត្រឹមត្រូវ!'})
-    if result:
-        return jsonify({'success': True, 'message': message})
-    return jsonify({'success': False, 'message': '❌ មិនអាចសម្អាតទិន្នន័យបាន!'})
 
 @app.route('/request_leave', methods=['POST'])
 def request_leave():
@@ -746,6 +747,7 @@ def approve_request():
         else:
             return jsonify({'success': False, 'message': 'ប្រភេទមិនត្រឹមត្រូវ'})
         if result:
+            clear_cache()
             return jsonify({'success': True, 'message': '✅ បានអនុម័តជោគជ័យ!'})
         return jsonify({'success': False, 'message': '❌ មិនអាចអនុម័តបាន!'})
     except Exception as e:
@@ -771,11 +773,128 @@ def reject_request():
         else:
             return jsonify({'success': False, 'message': 'ប្រភេទមិនត្រឹមត្រូវ'})
         if result:
+            clear_cache()
             return jsonify({'success': True, 'message': '✅ បានបដិសេធជោគជ័យ!'})
         return jsonify({'success': False, 'message': '❌ មិនអាចបដិសេធបាន!'})
     except Exception as e:
         print(f"❌ Error in reject_request: {e}")
         return jsonify({'success': False, 'message': f'កំហុស: {str(e)}'})
+
+# ============================================================
+# REGISTER, MANAGE USERS, CHANGE PASSWORD ROUTES
+# ============================================================
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+    message = ''
+    message_type = ''
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        full_name = request.form.get('full_name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        role = request.form.get('role')
+        if not username or not password or not full_name:
+            message = 'សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!'
+            message_type = 'error'
+        elif password != confirm_password:
+            message = 'ពាក្យសម្ងាត់មិនត្រូវគ្នា!'
+            message_type = 'error'
+        elif len(password) < 4:
+            message = 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!'
+            message_type = 'error'
+        else:
+            if create_user(username, password, full_name, email, phone, role):
+                message = f'✅ ចុះឈ្មោះអ្នកប្រើ "{username}" ជោគជ័យ!'
+                message_type = 'success'
+            else:
+                message = f'❌ ឈ្មោះអ្នកប្រើ "{username}" មានរួចហើយ!'
+                message_type = 'error'
+    return render_template_string(REGISTER_HTML, session=session, message=message, message_type=message_type)
+
+@app.route('/manage_users')
+def manage_users():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+    users = get_all_users()
+    for user in users:
+        user['id'] = str(user['_id'])
+    settings = get_all_attendance_settings()
+    settings_dict = {str(s.get('user_id')): s for s in settings}
+    user_locks = get_all_user_lock_status()
+    user_locks_dict = {str(u.get('id')): u for u in user_locks}
+    return render_template_string(USER_MANAGEMENT_HTML,
+                                   session=session,
+                                   users=users,
+                                   settings=settings_dict,
+                                   user_locks=user_locks_dict,
+                                   message='',
+                                   message_type='')
+
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    message = ''
+    message_type = ''
+    user_id = session.get('user_id')
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        if not current_password or not new_password or not confirm_password:
+            message = 'សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!'
+            message_type = 'error'
+        elif new_password != confirm_password:
+            message = 'ពាក្យសម្ងាត់ថ្មីមិនត្រូវគ្នា!'
+            message_type = 'error'
+        elif len(new_password) < 4:
+            message = 'ពាក្យសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច 4 តួ!'
+            message_type = 'error'
+        elif not verify_password(user_id, current_password):
+            message = 'ពាក្យសម្ងាត់បច្ចុប្បន្នមិនត្រឹមត្រូវ!'
+            message_type = 'error'
+        else:
+            if update_password(user_id, new_password):
+                message = '✅ បានប្តូរពាក្យសម្ងាត់ជោគជ័យ!'
+                message_type = 'success'
+            else:
+                message = '❌ មិនអាចប្តូរពាក្យសម្ងាត់បាន!'
+                message_type = 'error'
+    return render_template_string(CHANGE_PASSWORD_HTML, session=session, message=message, message_type=message_type)
+
+@app.route('/clean_data', methods=['POST'])
+def clean_data():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+    data = request.get_json()
+    clean_type = data.get('type', 'all')
+    if clean_type == 'all':
+        result = clean_all_data()
+        message = '✅ បានសម្អាតទិន្នន័យទាំងអស់ជោគជ័យ!'
+    elif clean_type == 'attendance':
+        result = clean_attendance_only()
+        message = '✅ បានសម្អាតទិន្នន័យវត្តមានជោគជ័យ!'
+    elif clean_type == 'leaves':
+        result = clean_leaves_only()
+        message = '✅ បានសម្អាតទិន្នន័យសុំច្បាប់ជោគជ័យ!'
+    elif clean_type == 'missions':
+        result = clean_missions_only()
+        message = '✅ បានសម្អាតទិន្នន័យបេសកម្មជោគជ័យ!'
+    else:
+        return jsonify({'success': False, 'message': 'ប្រភេទមិនត្រឹមត្រូវ!'})
+    if result:
+        clear_cache()
+        return jsonify({'success': True, 'message': message})
+    return jsonify({'success': False, 'message': '❌ មិនអាចសម្អាតទិន្នន័យបាន!'})
+
+# ============================================================
+# REPORT, EXCEL, AUTO UNLOCK ROUTES
+# ============================================================
 
 @app.route('/report')
 def report():
@@ -960,6 +1079,10 @@ def check_auto_unlock():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+# ============================================================
+# PWA, STATIC, EDIT/DELETE ATTENDANCE ROUTES
+# ============================================================
+
 @app.route('/static/manifest.json')
 def manifest():
     return {
@@ -1018,7 +1141,7 @@ self.addEventListener('fetch', function(e) {
 def static_files(filename):
     return send_from_directory('static', filename)
 
-@app.route('/edit_attendance/<int:attendance_id>', methods=['GET', 'POST'])
+@app.route('/edit_attendance/<attendance_id>', methods=['GET', 'POST'])
 def edit_attendance(attendance_id):
     if not session.get('logged_in') or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
@@ -1042,425 +1165,79 @@ def edit_attendance(attendance_id):
             return redirect(url_for('dashboard'))
         else:
             return "មិនអាចកែប្រែបាន!", 500
-    # ចម្លង edit_form_html ពីកូដចាស់របស់អ្នក
-    edit_form_html = '''<!DOCTYPE html>
-<html>
-<head><title>កែប្រែទិន្នន័យវត្តមាន</title>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Khmer OS', 'Arial', sans-serif; background: #f0f2f5; padding: 20px; }
-.container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-h2 { color: #1a73e8; margin-bottom: 20px; }
-.info { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-.info p { margin: 5px 0; }
-label { display: block; margin: 12px 0 5px; font-weight: 600; color: #555; }
-input, select { width: 100%; padding: 10px 14px; border: 2px solid #e8ecf1; border-radius: 8px; font-size: 14px; font-family: 'Khmer OS', 'Arial', sans-serif; }
-input:focus, select:focus { outline: none; border-color: #1a73e8; }
-.btn-group { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-.btn-save { flex: 1; background: #1a73e8; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: 'Khmer OS', 'Arial', sans-serif; }
-.btn-save:hover { background: #1557b0; }
-.btn-cancel { flex: 1; background: #dc3545; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: 'Khmer OS', 'Arial', sans-serif; text-decoration: none; text-align: center; }
-.btn-cancel:hover { background: #b02a37; }
-.hint { font-size: 12px; color: #888; margin-top: 3px; }
-@media (max-width: 600px) { .container { padding: 20px; } .btn-group { flex-direction: column; } }
-</style>
-</head>
-<body>
-<div class="container">
-    <h2>✏️ កែប្រែទិន្នន័យវត្តមាន</h2>
-    <div class="info">
-        <p><strong>ឈ្មោះបុគ្គលិក:</strong> {{ attendance.full_name }}</p>
-        <p><strong>ឈ្មោះអ្នកប្រើ:</strong> {{ attendance.username }}</p>
-    </div>
-    <form method="POST">
-        <label>📅 កាលបរិច្ឆេទចូល</label>
-        <input type="date" name="check_in_date" value="{{ attendance.date }}" required>
-        <label>⏰ ម៉ោងចូល</label>
-        <input type="time" name="check_in_time" value="{{ attendance.check_in.split(' ')[1][:5] if attendance.check_in else '' }}">
-        <label>📅 កាលបរិច្ឆេទចេញ</label>
-        <input type="date" name="check_out_date" value="{{ attendance.check_out.split(' ')[0] if attendance.check_out else attendance.date }}">
-        <label>⏰ ម៉ោងចេញ</label>
-        <input type="time" name="check_out_time" value="{{ attendance.check_out.split(' ')[1][:5] if attendance.check_out else '' }}">
-        <div class="hint">💡 សម្រាប់វគ្គយប់ ប្រសិនបើចេញព្រឹកថ្ងៃបន្ទាប់ សូមកំណត់កាលបរិច្ឆេទចេញជាថ្ងៃបន្ទាប់</div>
-        <label>វគ្គ</label>
-        <select name="shift">
-            <option value="1" {% if attendance.shift == 1 %}selected{% endif %}>វគ្គ 1 (ព្រឹក 07:00-11:00)</option>
-            <option value="2" {% if attendance.shift == 2 %}selected{% endif %}>វគ្គ 2 (រសៀល 13:00-17:00)</option>
-            <option value="3" {% if attendance.shift == 3 %}selected{% endif %}>វគ្គ 3 (យប់ 18:00-08:00)</option>
-        </select>
-        <div class="btn-group">
-            <button type="submit" class="btn-save">💾 រក្សាទុក</button>
-            <a href="/dashboard" class="btn-cancel">❌ បោះបង់</a>
+    edit_form_html = '''
+    <!DOCTYPE html>
+    <html>
+    <head><title>កែប្រែទិន្នន័យវត្តមាន</title>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Khmer OS', 'Arial', sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        h2 { color: #1a73e8; margin-bottom: 20px; }
+        .info { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+        .info p { margin: 5px 0; }
+        label { display: block; margin: 12px 0 5px; font-weight: 600; color: #555; }
+        input, select { width: 100%; padding: 10px 14px; border: 2px solid #e8ecf1; border-radius: 8px; font-size: 14px; font-family: 'Khmer OS', 'Arial', sans-serif; }
+        input:focus, select:focus { outline: none; border-color: #1a73e8; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .btn-save { flex: 1; background: #1a73e8; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: 'Khmer OS', 'Arial', sans-serif; }
+        .btn-save:hover { background: #1557b0; }
+        .btn-cancel { flex: 1; background: #dc3545; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: 'Khmer OS', 'Arial', sans-serif; text-decoration: none; text-align: center; }
+        .btn-cancel:hover { background: #b02a37; }
+        .hint { font-size: 12px; color: #888; margin-top: 3px; }
+        @media (max-width: 600px) { .container { padding: 20px; } .btn-group { flex-direction: column; } }
+    </style>
+    </head>
+    <body>
+    <div class="container">
+        <h2>✏️ កែប្រែទិន្នន័យវត្តមាន</h2>
+        <div class="info">
+            <p><strong>ឈ្មោះបុគ្គលិក:</strong> {{ attendance.full_name }}</p>
+            <p><strong>ឈ្មោះអ្នកប្រើ:</strong> {{ attendance.username }}</p>
         </div>
-    </form>
-</div>
-</body>
-</html>'''
+        <form method="POST">
+            <label>📅 កាលបរិច្ឆេទចូល</label>
+            <input type="date" name="check_in_date" value="{{ attendance.date }}" required>
+            <label>⏰ ម៉ោងចូល</label>
+            <input type="time" name="check_in_time" value="{{ attendance.check_in.split(' ')[1][:5] if attendance.check_in else '' }}">
+            <label>📅 កាលបរិច្ឆេទចេញ</label>
+            <input type="date" name="check_out_date" value="{{ attendance.check_out.split(' ')[0] if attendance.check_out else attendance.date }}">
+            <label>⏰ ម៉ោងចេញ</label>
+            <input type="time" name="check_out_time" value="{{ attendance.check_out.split(' ')[1][:5] if attendance.check_out else '' }}">
+            <div class="hint">💡 សម្រាប់វគ្គយប់ ប្រសិនបើចេញព្រឹកថ្ងៃបន្ទាប់ សូមកំណត់កាលបរិច្ឆេទចេញជាថ្ងៃបន្ទាប់</div>
+            <label>វគ្គ</label>
+            <select name="shift">
+                <option value="1" {% if attendance.shift == 1 %}selected{% endif %}>វគ្គ 1 (ព្រឹក 07:00-11:00)</option>
+                <option value="2" {% if attendance.shift == 2 %}selected{% endif %}>វគ្គ 2 (រសៀល 13:00-17:00)</option>
+                <option value="3" {% if attendance.shift == 3 %}selected{% endif %}>វគ្គ 3 (យប់ 18:00-08:00)</option>
+            </select>
+            <div class="btn-group">
+                <button type="submit" class="btn-save">💾 រក្សាទុក</button>
+                <a href="/dashboard" class="btn-cancel">❌ បោះបង់</a>
+            </div>
+        </form>
+    </div>
+    </body>
+    </html>
+    '''
     return render_template_string(edit_form_html, attendance=attendance)
 
-@app.route('/delete_attendance/<int:attendance_id>', methods=['POST'])
+@app.route('/delete_attendance/<attendance_id>', methods=['POST'])
 def delete_attendance_route(attendance_id):
     if not session.get('logged_in') or session.get('role') != 'admin':
         return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-
     result = delete_attendance(attendance_id)
     if result:
+        clear_cache()
         return jsonify({'success': True, 'message': '✅ លុបទិន្នន័យជោគជ័យ!'})
     else:
         return jsonify({'success': False, 'message': '❌ មិនអាចលុបទិន្នន័យបាន!'})
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(os.path.join('static', 'uploads'), filename)
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = get_user_by_username(username)
-        if user and user['password'] == password:
-            session['logged_in'] = True
-            session['username'] = username
-            session['user_id'] = str(user['_id'])  # ← កែត្រង់នេះ! (ប្រើ '_id')
-            session['role'] = user['role']
-            session['full_name'] = user['full_name']
-            return redirect(url_for('dashboard'))
-        else:
-            return '''
-            <!DOCTYPE html>
-            <html>
-            <head><title>កំហុស</title><meta charset="UTF-8">
-            <style>
-                body { font-family:'Khmer OS',Arial; text-align:center; padding:50px; background:#f0f2f5; }
-                .box { background:white; padding:40px; border-radius:16px; max-width:400px; margin:0 auto; box-shadow:0 4px 20px rgba(0,0,0,0.08); }
-                h3 { color:#dc3545; }
-                .back-link { display:inline-block; margin-top:20px; color:#1a73e8; text-decoration:none; padding:10px 25px; border:2px solid #1a73e8; border-radius:10px; }
-                .back-link:hover { background:#1a73e8; color:white; }
-            </style>
-            </head>
-            <body>
-                <div class="box">
-                    <h3>❌ ឈ្មោះអ្នកប្រើ ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ!</h3>
-                    <a href="/login" class="back-link">← ត្រលប់មកវិញ</a>
-                </div>
-            </body>
-            </html>
-            '''
-    return '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>ចូលប្រើប្រព័ន្ធ</title>
-    <meta charset="UTF-8">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#1a73e8">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="HR System">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body {
-            height: 100%;
-            width: 100%;
-            font-family: 'Khmer OS', Arial, sans-serif;
-            background: #ffffff;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-        .login-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-            padding: 15px;
-            background: #ffffff;
-        }
-        .login-box {
-            width: 100%;
-            height: 100%;
-            max-width: 480px;
-            max-height: 600px;
-            background: #ffffff;
-            padding: 40px 30px;
-            border-radius: 24px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
-            border: 1px solid #f0f0f0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            animation: fadeInUp 0.5s ease;
-        }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .logo-icon {
-            text-align: center;
-            font-size: 65px;
-            margin-bottom: 8px;
-        }
-        .login-box h2 {
-            text-align: center;
-            color: #1a1a2e;
-            font-size: 30px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-        .login-box .sub-title {
-            text-align: center;
-            color: #888;
-            font-size: 15px;
-            margin-bottom: 28px;
-        }
-        .login-box .form-group {
-            margin-bottom: 16px;
-        }
-        .login-box input {
-            width: 100%;
-            padding: 16px 18px;
-            border: 2px solid #e8ecf1;
-            border-radius: 14px;
-            font-size: 17px;
-            box-sizing: border-box;
-            font-family: 'Khmer OS', Arial, sans-serif;
-            transition: all 0.3s;
-            background: #f8f9fa;
-        }
-        .login-box input:focus {
-            outline: none;
-            border-color: #1a73e8;
-            background: white;
-            box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.08);
-        }
-        .login-box button {
-            width: 100%;
-            padding: 16px;
-            background: #1a73e8;
-            color: white;
-            border: none;
-            border-radius: 14px;
-            font-size: 18px;
-            cursor: pointer;
-            font-family: 'Khmer OS', Arial, sans-serif;
-            font-weight: 600;
-            transition: all 0.3s;
-            margin-top: 4px;
-        }
-        .login-box button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(26, 115, 232, 0.35);
-        }
-        .login-box button:active { transform: scale(0.98); }
-        .login-box .hint {
-            text-align: center;
-            margin-top: 16px;
-            color: #999;
-            font-size: 13px;
-        }
-        .login-box .hint b { color: #1a73e8; }
-        .login-box .footer-text {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid #eee;
-            color: #ccc;
-            font-size: 12px;
-        }
-        @media (max-width: 600px) {
-            .login-box {
-                padding: 30px 22px;
-                border-radius: 18px;
-                max-height: none;
-            }
-            .login-box h2 {
-                font-size: 26px;
-            }
-            .login-box input {
-                padding: 15px 16px;
-                font-size: 16px;
-            }
-            .login-box button {
-                padding: 15px;
-                font-size: 17px;
-            }
-            .logo-icon {
-                font-size: 55px;
-            }
-        }
-        @media (max-width: 400px) {
-            .login-container {
-                padding: 10px;
-            }
-            .login-box {
-                padding: 22px 16px;
-                border-radius: 14px;
-            }
-            .login-box h2 {
-                font-size: 22px;
-            }
-            .login-box input {
-                padding: 13px 14px;
-                font-size: 15px;
-            }
-            .login-box button {
-                padding: 13px;
-                font-size: 16px;
-            }
-            .logo-icon {
-                font-size: 45px;
-            }
-            .login-box .sub-title {
-                font-size: 13px;
-                margin-bottom: 20px;
-            }
-        }
-        @media (max-height: 600px) {
-            .login-box {
-                padding: 20px 20px;
-            }
-            .logo-icon {
-                font-size: 40px;
-                margin-bottom: 4px;
-            }
-            .login-box h2 {
-                font-size: 22px;
-                margin-bottom: 2px;
-            }
-            .login-box .sub-title {
-                font-size: 13px;
-                margin-bottom: 16px;
-            }
-            .login-box .form-group {
-                margin-bottom: 10px;
-            }
-            .login-box input {
-                padding: 12px 14px;
-                font-size: 15px;
-            }
-            .login-box button {
-                padding: 12px;
-                font-size: 16px;
-            }
-            .login-box .hint {
-                margin-top: 10px;
-                font-size: 12px;
-            }
-            .login-box .footer-text {
-                margin-top: 12px;
-                padding-top: 10px;
-                font-size: 11px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <div class="login-box">
-            <div class="logo-icon">🏢</div>
-            <h2 style="font-family: 'Khmer', 'Khmer OS Muol Light', 'Khmer OS', Arial, sans-serif; font-weight: 300; color: #1a73e8;">ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</h2>
-            <div class="sub-title">សូមបញ្ចូលឈ្មោះ និងពាក្យសម្ងាត់</div>
-            <form method="POST" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-                <div class="form-group">
-                    <input type="text" name="username" placeholder="ឈ្មោះអ្នកប្រើ" required>
-                </div>
-                <div class="form-group">
-                    <input type="password" name="password" placeholder="ពាក្យសម្ងាត់" required>
-                </div>
-                <button type="submit">🔐 Login</button>
-            </form>
-            <div class="hint"><b>ពត៌មានបន្ថែមៈ ទំនាក់ទំនងលោក YEN SONY</b></div>
-            <div class="hint"><b>ទូរស័ព្ទ៖ +855 92 740 067</b></div>
-            <div class="footer-text">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</div>
-        </div>
-    </div>
-    <script>
-        let deferredPrompt;
-        const installBtn = document.createElement('button');
-        installBtn.id = 'pwaInstallBtn';
-        installBtn.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #34a853;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            padding: 14px 30px;
-            font-size: 16px;
-            font-family: 'Khmer OS', Arial, sans-serif;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(52, 168, 83, 0.4);
-            z-index: 9999;
-            display: none;
-            animation: slideUp 0.5s ease;
-        `;
-        installBtn.innerHTML = '📲 ដំឡើងកម្មវិធី';
-        document.body.appendChild(installBtn);
-
-        const stylePwa = document.createElement('style');
-        stylePwa.textContent = `
-            @keyframes slideUp {
-                from { transform: translateX(-50%) translateY(100px); opacity: 0; }
-                to { transform: translateX(-50%) translateY(0); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(stylePwa);
-
-        window.addEventListener('beforeinstallprompt', function(e) {
-            e.preventDefault();
-            deferredPrompt = e;
-            installBtn.style.display = 'block';
-        });
-
-        installBtn.addEventListener('click', function() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then(function(choiceResult) {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted the install prompt');
-                        installBtn.style.display = 'none';
-                    } else {
-                        console.log('User dismissed the install prompt');
-                    }
-                    deferredPrompt = null;
-                });
-            }
-        });
-
-        window.addEventListener('appinstalled', function() {
-            console.log('App installed successfully!');
-            installBtn.style.display = 'none';
-        });
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/sw.js')
-            .then(function(reg) {
-                console.log('Service Worker registered successfully!');
-            })
-            .catch(function(err) {
-                console.log('Service Worker registration failed:', err);
-            });
-        }
-
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            installBtn.style.display = 'none';
-        }
-    </script>
-</body>
-</html>
-'''
-
-   
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
 # ============================================================
 # DASHBOARD_HTML - កែសម្រួលផ្នែក JavaScript សម្រាប់ toggleSystemLock
 # ============================================================
