@@ -1040,7 +1040,7 @@ input:focus, select:focus { outline: none; border-color: #1a73e8; }
 
 @app.route('/delete_attendance/<int:attendance_id>', methods=['POST'])
 def delete_attendance_route(attendance_id):
-   if not session.get('logged_in') or session.get('role') != 'admin':
+    if not session.get('logged_in') or session.get('role') != 'admin':
         return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
 
     result = delete_attendance(attendance_id)
@@ -1048,7 +1048,6 @@ def delete_attendance_route(attendance_id):
         return jsonify({'success': True, 'message': '✅ លុបទិន្នន័យជោគជ័យ!'})
     else:
         return jsonify({'success': False, 'message': '❌ មិនអាចលុបទិន្នន័យបាន!'})
-
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(os.path.join('static', 'uploads'), filename)
