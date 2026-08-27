@@ -4104,229 +4104,256 @@ USER_MANAGEMENT_HTML = '''<!DOCTYPE html>
     </div>
 
     <script>
-        function openEditUserModal(userId) {
-            fetch('/get_user/' + userId)
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('editUserId').value = data.id;
-                document.getElementById('editUsername').value = data.username;
-                document.getElementById('editFullName').value = data.full_name;
-                document.getElementById('editEmail').value = data.email || '';
-                document.getElementById('editPhone').value = data.phone || '';
-                document.getElementById('editRole').value = data.role || 'user';
-                openModal('editUserModal');
-            })
-            .catch(err => alert('មានបញ្ហា: ' + err));
-        }
+       // USER_MANAGEMENT_HTML - កែ JavaScript
 
-        function submitEditUser() {
-            var id = document.getElementById('editUserId').value;
-            var data = {
-                username: document.getElementById('editUsername').value.trim(),
-                full_name: document.getElementById('editFullName').value.trim(),
-                email: document.getElementById('editEmail').value.trim(),
-                phone: document.getElementById('editPhone').value.trim(),
-                role: document.getElementById('editRole').value
-            };
-            if (!data.username || !data.full_name) {
-                alert('សូមបំពេញឈ្មោះអ្នកប្រើ និងឈ្មោះពេញ!');
+function openEditUserModal(userId) {
+    fetch('/get_user/' + userId)
+    .then(res => {
+        if (!res.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return res.json();
+    })
+    .then(data => {
+        document.getElementById('editUserId').value = data.id;
+        document.getElementById('editUsername').value = data.username;
+        document.getElementById('editFullName').value = data.full_name;
+        document.getElementById('editEmail').value = data.email || '';
+        document.getElementById('editPhone').value = data.phone || '';
+        document.getElementById('editRole').value = data.role || 'user';
+        openModal('editUserModal');
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
+
+function submitEditUser() {
+    var id = document.getElementById('editUserId').value;
+    var data = {
+        username: document.getElementById('editUsername').value.trim(),
+        full_name: document.getElementById('editFullName').value.trim(),
+        email: document.getElementById('editEmail').value.trim(),
+        phone: document.getElementById('editPhone').value.trim(),
+        role: document.getElementById('editRole').value
+    };
+    if (!data.username || !data.full_name) {
+        alert('សូមបំពេញឈ្មោះអ្នកប្រើ និងឈ្មោះពេញ!');
+        return;
+    }
+    fetch('/update_user/' + id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(result => {
+        alert(result.message);
+        if (result.success) {
+            closeModal('editUserModal');
+            location.reload();
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
+
+function openAddUserModal() {
+    document.getElementById('addUsername').value = '';
+    document.getElementById('addPassword').value = '';
+    document.getElementById('addFullName').value = '';
+    document.getElementById('addEmail').value = '';
+    document.getElementById('addPhone').value = '';
+    document.getElementById('addRole').value = 'user';
+    openModal('addUserModal');
+}
+
+function submitAddUser() {
+    var data = {
+        username: document.getElementById('addUsername').value.trim(),
+        password: document.getElementById('addPassword').value.trim(),
+        full_name: document.getElementById('addFullName').value.trim(),
+        email: document.getElementById('addEmail').value.trim(),
+        phone: document.getElementById('addPhone').value.trim(),
+        role: document.getElementById('addRole').value
+    };
+    if (!data.username || !data.password || !data.full_name) {
+        alert('សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!');
+        return;
+    }
+    if (data.password.length < 4) {
+        alert('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!');
+        return;
+    }
+    fetch('/add_user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(result => {
+        alert(result.message);
+        if (result.success) {
+            closeModal('addUserModal');
+            location.reload();
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
+
+function deleteUser(userId, username) {
+    if (!confirm('តើអ្នកចង់លុបអ្នកប្រើ "' + username + '" មែនទេ? (ទិន្នន័យទាំងអស់របស់គាត់នឹងត្រូវលុប!)')) return;
+    fetch('/delete_user/' + userId, { method: 'POST' })
+    .then(res => res.json())
+    .then(result => {
+        alert(result.message);
+        if (result.success) location.reload();
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
+
+function resetPassword(userId, username) {
+    var newPassword = prompt('សូមបញ្ចូលពាក្យសម្ងាត់ថ្មីសម្រាប់ "' + username + '" (យ៉ាងតិច 4 តួ):');
+    if (newPassword === null) return;
+    if (!newPassword || newPassword.length < 4) {
+        alert('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!');
+        return;
+    }
+    fetch('/admin_reset_password/' + userId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_password: newPassword })
+    })
+    .then(response => response.json())
+    .then(result => {
+        alert(result.message);
+        if (result.success) location.reload();
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
+
+function toggleUserLock(userId, username, isLocked) {
+    var action = isLocked ? 'បើក' : 'បិទ';
+    var confirmMsg = 'តើអ្នកចង់' + action + 'ការចូលធ្វើការរបស់ "' + username + '" មែនទេ?';
+    if (!confirm(confirmMsg)) return;
+
+    var autoUnlockTime = null;
+    if (!isLocked) {
+        autoUnlockTime = prompt('សូមបញ្ចូលពេលវេលាបើកដោយស្វ័យប្រវត្តិ (HH:MM) ឬទុកចោលសម្រាប់មិនកំណត់:', '');
+        if (autoUnlockTime !== null && autoUnlockTime !== '') {
+            var timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!timeRegex.test(autoUnlockTime)) {
+                alert('ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM (ឧទាហរណ៍: 08:00)');
                 return;
             }
-            fetch('/update_user/' + id, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(result => {
-                alert(result.message);
-                if (result.success) {
-                    closeModal('editUserModal');
-                    location.reload();
-                }
-            })
-            .catch(err => alert('មានបញ្ហា: ' + err));
         }
-
-        function openAddUserModal() {
-            document.getElementById('addUsername').value = '';
-            document.getElementById('addPassword').value = '';
-            document.getElementById('addFullName').value = '';
-            document.getElementById('addEmail').value = '';
-            document.getElementById('addPhone').value = '';
-            document.getElementById('addRole').value = 'user';
-            openModal('addUserModal');
+        if (autoUnlockTime === '') {
+            autoUnlockTime = null;
         }
+    }
 
-        function submitAddUser() {
-            var data = {
-                username: document.getElementById('addUsername').value.trim(),
-                password: document.getElementById('addPassword').value.trim(),
-                full_name: document.getElementById('addFullName').value.trim(),
-                email: document.getElementById('addEmail').value.trim(),
-                phone: document.getElementById('addPhone').value.trim(),
-                role: document.getElementById('addRole').value
-            };
-            if (!data.username || !data.password || !data.full_name) {
-                alert('សូមបំពេញព័ត៌មានឲ្យបានពេញលេញ!');
-                return;
-            }
-            if (data.password.length < 4) {
-                alert('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!');
-                return;
-            }
-            fetch('/add_user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(result => {
-                alert(result.message);
-                if (result.success) {
-                    closeModal('addUserModal');
-                    location.reload();
-                }
-            })
-            .catch(err => alert('មានបញ្ហា: ' + err));
+    var newState = isLocked ? 0 : 1;
+
+    fetch('/toggle_user_lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: parseInt(userId),
+            lock_state: newState,
+            auto_unlock_time: autoUnlockTime
+        })
+    })
+    .then(res => res.json())
+    .then(result => {
+        alert(result.message);
+        if (result.success) location.reload();
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
+
+function openAttendanceSettingModal(userId, username) {
+    document.getElementById('settingUserId').value = userId;
+    document.getElementById('settingUsername').value = username;
+
+    fetch('/get_attendance_setting/' + userId)
+    .then(res => res.json())
+    .then(data => {
+        if (data.check_in_deadline) {
+            document.getElementById('settingDeadline').value = data.check_in_deadline;
+        } else {
+            document.getElementById('settingDeadline').value = '';
         }
+        document.getElementById('settingIsActive').checked = data.is_active == 1;
+        openModal('attendanceSettingModal');
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
 
-        function deleteUser(userId, username) {
-            if (!confirm('តើអ្នកចង់លុបអ្នកប្រើ "' + username + '" មែនទេ? (ទិន្នន័យទាំងអស់របស់គាត់នឹងត្រូវលុប!)')) return;
-            fetch('/delete_user/' + userId, { method: 'POST' })
-            .then(res => res.json())
-            .then(result => {
-                alert(result.message);
-                if (result.success) location.reload();
-            })
-            .catch(err => alert('មានបញ្ហា: ' + err));
+function submitAttendanceSetting() {
+    var userId = document.getElementById('settingUserId').value;
+    var deadline = document.getElementById('settingDeadline').value;
+    var isActive = document.getElementById('settingIsActive').checked ? 1 : 0;
+
+    if (isActive && !deadline) {
+        alert('សូមបញ្ចូលម៉ោងកំណត់!');
+        return;
+    }
+
+    fetch('/save_attendance_setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: parseInt(userId),
+            check_in_deadline: deadline,
+            is_active: isActive
+        })
+    })
+    .then(res => res.json())
+    .then(result => {
+        alert(result.message);
+        if (result.success) {
+            closeModal('attendanceSettingModal');
+            location.reload();
         }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('មានបញ្ហា: ' + err.message);
+    });
+}
 
-        function resetPassword(userId, username) {
-            var newPassword = prompt('សូមបញ្ចូលពាក្យសម្ងាត់ថ្មីសម្រាប់ "' + username + '" (យ៉ាងតិច 4 តួ):');
-            if (newPassword === null) return;
-            if (!newPassword || newPassword.length < 4) {
-                alert('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច 4 តួ!');
-                return;
-            }
-            fetch('/admin_reset_password/' + userId, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ new_password: newPassword })
-            })
-            .then(response => response.json())
-            .then(result => {
-                alert(result.message);
-                if (result.success) location.reload();
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('មានបញ្ហា: ' + err);
-            });
-        }
+function openModal(id) { 
+    document.getElementById(id).classList.add('show'); 
+}
 
-        // ===== USER LOCK FUNCTIONS =====
-        function toggleUserLock(userId, username, isLocked) {
-            var action = isLocked ? 'បើក' : 'បិទ';
-            var confirmMsg = 'តើអ្នកចង់' + action + 'ការចូលធ្វើការរបស់ "' + username + '" មែនទេ?';
+function closeModal(id) { 
+    document.getElementById(id).classList.remove('show'); 
+}
 
-            if (!confirm(confirmMsg)) return;
-
-            var autoUnlockTime = null;
-            if (!isLocked) {
-                autoUnlockTime = prompt('សូមបញ្ចូលពេលវេលាបើកដោយស្វ័យប្រវត្តិ (HH:MM) ឬទុកចោលសម្រាប់មិនកំណត់:', '');
-                if (autoUnlockTime !== null && autoUnlockTime !== '') {
-                    var timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-                    if (!timeRegex.test(autoUnlockTime)) {
-                        alert('ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM (ឧទាហរណ៍: 08:00)');
-                        return;
-                    }
-                }
-                if (autoUnlockTime === '') {
-                    autoUnlockTime = null;
-                }
-            }
-
-            var newState = isLocked ? 0 : 1;
-
-            fetch('/toggle_user_lock', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: userId,
-                    lock_state: newState,
-                    auto_unlock_time: autoUnlockTime
-                })
-            })
-            .then(res => res.json())
-            .then(result => {
-                alert(result.message);
-                if (result.success) location.reload();
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('មានបញ្ហា: ' + err);
-            });
-        }
-
-        // ===== ATTENDANCE SETTING FUNCTIONS =====
-        function openAttendanceSettingModal(userId, username) {
-            document.getElementById('settingUserId').value = userId;
-            document.getElementById('settingUsername').value = username;
-
-            fetch('/get_attendance_setting/' + userId)
-            .then(res => res.json())
-            .then(data => {
-                if (data.check_in_deadline) {
-                    document.getElementById('settingDeadline').value = data.check_in_deadline;
-                } else {
-                    document.getElementById('settingDeadline').value = '';
-                }
-                document.getElementById('settingIsActive').checked = data.is_active == 1;
-                openModal('attendanceSettingModal');
-            })
-            .catch(err => alert('មានបញ្ហា: ' + err));
-        }
-
-        function submitAttendanceSetting() {
-            var userId = document.getElementById('settingUserId').value;
-            var deadline = document.getElementById('settingDeadline').value;
-            var isActive = document.getElementById('settingIsActive').checked ? 1 : 0;
-
-            if (isActive && !deadline) {
-                alert('សូមបញ្ចូលម៉ោងកំណត់!');
-                return;
-            }
-
-            fetch('/save_attendance_setting', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: parseInt(userId),
-                    check_in_deadline: deadline,
-                    is_active: isActive
-                })
-            })
-            .then(res => res.json())
-            .then(result => {
-                alert(result.message);
-                if (result.success) {
-                    closeModal('attendanceSettingModal');
-                    location.reload();
-                }
-            })
-            .catch(err => alert('មានបញ្ហា: ' + err));
-        }
-
-        function openModal(id) { document.getElementById(id).classList.add('show'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-
-        document.querySelectorAll('.modal').forEach(function(modal) {
-            modal.addEventListener('click', function(e) {
-                if (e.target === this) this.classList.remove('show');
-            });
-        });
-    </script>
+// Close modal when clicking outside
+document.querySelectorAll('.modal').forEach(function(modal) {
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('show');
+    });
+});    </script>
 </body>
 </html>'''
 
