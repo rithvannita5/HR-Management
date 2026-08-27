@@ -1,6 +1,0 @@
-Flask
-pytz
-openpyxl
-pymongo
-dnspython
-gunicorn
