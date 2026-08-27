@@ -4,8 +4,11 @@ services:
     env: python
     buildCommand: |
       pip install -r requirements.txt
-      python -c "from flask_app import app, init_db; app.app_context().push(); init_db()"
     startCommand: gunicorn flask_app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: MONGO_URI
+        value: mongodb+srv://rithvannita5_db_user:rith778899@cluster0.oaj62a4.mongodb.net/?appName=Cluster0
+      - key: DB_NAME
+        value: hr_system
