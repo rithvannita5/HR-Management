@@ -497,7 +497,15 @@ def get_user(user_id):
     user = get_user_by_id(user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
-    return jsonify({'id': user.get('id', str(user.get('_id'))), 'username': user['username'], 'full_name': user['full_name'], 'email': user.get('email') or '', 'phone': user.get('phone') or '', 'role': user.get('role')})
+    # MongoDB uses '_id' not 'id'
+    return jsonify({
+        'id': str(user['_id']),  # ← ត្រូវប្រាកដថាប្រើ '_id'
+        'username': user['username'],
+        'full_name': user['full_name'],
+        'email': user.get('email') or '',
+        'phone': user.get('phone') or '',
+        'role': user.get('role')
+    })
 
 @app.route('/get_attendance_setting/<int:user_id>')
 def get_attendance_setting_route(user_id):
@@ -3988,15 +3996,14 @@ USER_MANAGEMENT_HTML = '''<!DOCTYPE html>
                             {% endif %}
                         </td>
                         <td>
-                            <button class="btn-action btn-edit" onclick="openEditUserModal({{ user.id }})">✏️ កែ</button>
-                            <button class="btn-setting" onclick="openAttendanceSettingModal({{ user.id }}, '{{ user.username }}')">⚙️ ម៉ោង</button>
-                            <button class="btn-action" onclick="toggleUserLock({{ user.id }}, '{{ user.username }}', {% if lock and lock.is_locked == 1 %}true{% else %}false{% endif %})"
-                                    style="background:{% if lock and lock.is_locked == 1 %}#dc3545;color:white{% else %}#4caf50;color:white{% endif %};padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Khmer OS','Khmer OS Muol','Arial',sans-serif;margin:2px;">
-                                {% if lock and lock.is_locked == 1 %}🔓 បើក{% else %}🔒 បិទ{% endif %}
+                            <button class="btn-action btn-edit" onclick="openEditUserModal('{{ user.id }}')">✏️ កែ</button>
+                            <button class="btn-setting" onclick="openAttendanceSettingModal('{{ user.id }}', '{{ user.username }}')">⚙️ ម៉ោង</button>
+                            <button class="btn-action" onclick="toggleUserLock('{{ user.id }}', '{{ user.username }}', {% if lock and lock.is_locked == 1 %}true{% else %}false{% endif %})">
+                            {% if lock and lock.is_locked == 1 %}🔓 បើក{% else %}🔒 បិទ{% endif %}
                             </button>
-                            <button class="btn-action" onclick="resetPassword({{ user.id }}, '{{ user.username }}')" style="background:#fbbc04;color:#333;padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Khmer OS','Khmer OS Muol','Arial',sans-serif;margin:2px;">🔑 ពាក្យសម្ងាត់</button>
+                            <button class="btn-action" onclick="resetPassword('{{ user.id }}', '{{ user.username }}')">🔑 ពាក្យសម្ងាត់</button>
                             {% if user.id != session.user_id %}
-                            <button class="btn-action btn-delete" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">🗑️ លុប</button>
+                            <button class="btn-action btn-delete" onclick="deleteUser('{{ user.id }}', '{{ user.username }}')">🗑️ លុប</button>
                             {% else %}
                             <span style="font-size:11px;color:#999;">(អ្នកចូល)</span>
                             {% endif %}
@@ -4106,15 +4113,21 @@ USER_MANAGEMENT_HTML = '''<!DOCTYPE html>
     <script>
        // USER_MANAGEMENT_HTML - កែ JavaScript
 
+// ===== USER MANAGEMENT JAVASCRIPT - កែទាំងមូល =====
+
 function openEditUserModal(userId) {
+    if (!userId) {
+        alert('មិនមាន ID អ្នកប្រើ!');
+        return;
+    }
     fetch('/get_user/' + userId)
-    .then(res => {
+    .then(function(res) {
         if (!res.ok) {
             throw new Error('Network response was not ok');
         }
         return res.json();
     })
-    .then(data => {
+    .then(function(data) {
         document.getElementById('editUserId').value = data.id;
         document.getElementById('editUsername').value = data.username;
         document.getElementById('editFullName').value = data.full_name;
@@ -4123,7 +4136,7 @@ function openEditUserModal(userId) {
         document.getElementById('editRole').value = data.role || 'user';
         openModal('editUserModal');
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
@@ -4147,15 +4160,15 @@ function submitEditUser() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
-    .then(res => res.json())
-    .then(result => {
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
         alert(result.message);
         if (result.success) {
             closeModal('editUserModal');
             location.reload();
         }
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
@@ -4193,35 +4206,43 @@ function submitAddUser() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
-    .then(res => res.json())
-    .then(result => {
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
         alert(result.message);
         if (result.success) {
             closeModal('addUserModal');
             location.reload();
         }
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
 }
 
 function deleteUser(userId, username) {
-    if (!confirm('តើអ្នកចង់លុបអ្នកប្រើ "' + username + '" មែនទេ? (ទិន្នន័យទាំងអស់របស់គាត់នឹងត្រូវលុប!)')) return;
+    if (!userId) {
+        alert('មិនមាន ID អ្នកប្រើ!');
+        return;
+    }
+    if (!confirm('តើអ្នកចង់លុបអ្នកប្រើ "' + username + '" មែនទេ?')) return;
     fetch('/delete_user/' + userId, { method: 'POST' })
-    .then(res => res.json())
-    .then(result => {
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
         alert(result.message);
         if (result.success) location.reload();
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
 }
 
 function resetPassword(userId, username) {
+    if (!userId) {
+        alert('មិនមាន ID អ្នកប្រើ!');
+        return;
+    }
     var newPassword = prompt('សូមបញ្ចូលពាក្យសម្ងាត់ថ្មីសម្រាប់ "' + username + '" (យ៉ាងតិច 4 តួ):');
     if (newPassword === null) return;
     if (!newPassword || newPassword.length < 4) {
@@ -4233,18 +4254,22 @@ function resetPassword(userId, username) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_password: newPassword })
     })
-    .then(response => response.json())
-    .then(result => {
+    .then(function(response) { return response.json(); })
+    .then(function(result) {
         alert(result.message);
         if (result.success) location.reload();
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
 }
 
 function toggleUserLock(userId, username, isLocked) {
+    if (!userId) {
+        alert('មិនមាន ID អ្នកប្រើ!');
+        return;
+    }
     var action = isLocked ? 'បើក' : 'បិទ';
     var confirmMsg = 'តើអ្នកចង់' + action + 'ការចូលធ្វើការរបស់ "' + username + '" មែនទេ?';
     if (!confirm(confirmMsg)) return;
@@ -4275,24 +4300,28 @@ function toggleUserLock(userId, username, isLocked) {
             auto_unlock_time: autoUnlockTime
         })
     })
-    .then(res => res.json())
-    .then(result => {
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
         alert(result.message);
         if (result.success) location.reload();
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
 }
 
 function openAttendanceSettingModal(userId, username) {
+    if (!userId) {
+        alert('មិនមាន ID អ្នកប្រើ!');
+        return;
+    }
     document.getElementById('settingUserId').value = userId;
     document.getElementById('settingUsername').value = username;
 
     fetch('/get_attendance_setting/' + userId)
-    .then(res => res.json())
-    .then(data => {
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
         if (data.check_in_deadline) {
             document.getElementById('settingDeadline').value = data.check_in_deadline;
         } else {
@@ -4301,7 +4330,7 @@ function openAttendanceSettingModal(userId, username) {
         document.getElementById('settingIsActive').checked = data.is_active == 1;
         openModal('attendanceSettingModal');
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
@@ -4326,15 +4355,15 @@ function submitAttendanceSetting() {
             is_active: isActive
         })
     })
-    .then(res => res.json())
-    .then(result => {
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
         alert(result.message);
         if (result.success) {
             closeModal('attendanceSettingModal');
             location.reload();
         }
     })
-    .catch(err => {
+    .catch(function(err) {
         console.error('Error:', err);
         alert('មានបញ្ហា: ' + err.message);
     });
@@ -4353,7 +4382,8 @@ document.querySelectorAll('.modal').forEach(function(modal) {
     modal.addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
     });
-});    </script>
+});
+</script>
 </body>
 </html>'''
 
