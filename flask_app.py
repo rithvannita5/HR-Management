@@ -1441,532 +1441,522 @@ DASHBOARD_HTML = r'''
     <meta name="apple-mobile-web-app-title" content="HR System">
     <link href="https://fonts.googleapis.com/css2?family=Khmer&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; background: #f0f2f5; padding: 15px; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header {
-            background: linear-gradient(135deg, #1a73e8, #0d47a1);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .header-left h2 { font-size: 18px; font-weight: 600; white-space: nowrap; }
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .header-right .nav-btn {
-            color: white;
-            text-decoration: none;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.3s;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.15);
-            white-space: nowrap;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            cursor: pointer;
-        }
-        .header-right .nav-btn:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
-        .header-right .nav-btn.location-btn {
-            background: rgba(255, 193, 7, 0.3);
-            border-color: #ffc107;
-        }
-        .header-right .nav-btn.location-btn:hover {
-            background: rgba(255, 193, 7, 0.5);
-        }
-        .header-right .user-name-btn {
-            color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 500;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.25);
-            white-space: nowrap;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            cursor: default;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .header-right .logout-link {
-            color: white;
-            text-decoration: none;
-            background: rgba(255,255,255,0.2);
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            transition: all 0.3s;
-            font-weight: 500;
-            border: 1px solid rgba(255,255,255,0.15);
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-        }
-        .header-right .logout-link:hover { background: rgba(255,255,255,0.35); transform: scale(1.05); }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .stat-card {
-            background: white;
-            padding: 18px 15px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-        .stat-card .stat-icon { font-size: 28px; display: block; margin-bottom: 4px; }
-        .stat-card .number { font-size: 30px; font-weight: 700; color: #1a73e8; }
-        .stat-card .number.green { color: #34a853; }
-        .stat-card .number.orange { color: #fbbc04; }
-        .stat-card .number.purple { color: #7c3aed; }
-        .stat-card .label { font-size: 13px; color: #888; margin-top: 2px; }
-        .action-buttons {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .action-buttons .btn {
-            padding: 14px 10px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 16px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            transition: all 0.3s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            font-weight: 500;
-            min-height: 65px;
-            color: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .action-buttons .btn .icon { font-size: 28px; }
-        .action-buttons .btn .sub-text { font-size: 12px; opacity: 0.85; font-weight: 400; }
-        .action-buttons .btn:hover { transform: translateY(-3px); box-shadow: 0 6px 25px rgba(0,0,0,0.15); }
-        .action-buttons .btn:active { transform: scale(0.95); }
-        .action-buttons .btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-        .btn-checkin { background: linear-gradient(135deg, #34a853, #1e7e34); }
-        .btn-checkout { background: linear-gradient(135deg, #dc3545, #b02a37); }
-        .btn-leave { background: linear-gradient(135deg, #fbbc04, #e5a800); color: #333; }
-        .btn-mission { background: linear-gradient(135deg, #1a73e8, #0d47a1); }
-        .table-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            overflow-x: auto;
-        }
-        .table-container .table-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .table-container .table-title .badge-count {
-            background: #1a73e8;
-            color: white;
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        table thead th {
-            background: #f8f9fa;
-            color: #555;
-            padding: 12px 15px;
-            text-align: left;
-            font-size: 13px;
-            font-weight: 600;
-            border-bottom: 2px solid #e8ecf1;
-        }
-        table tbody td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #f0f2f5;
-            color: #333;
-            font-size: 14px;
-        }
-        table tbody tr:hover { background: #f8f9fa; }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .status-badge.present { background: #e8f5e9; color: #2e7d32; }
-        .status-badge.outside { background: #ffebee; color: #c62828; }
-        .status-badge.working { background: #fff3cd; color: #856404; }
-        .status-badge.leave { background: #fff3cd; color: #856404; }
-        .status-badge.mission { background: #d1ecf1; color: #0c5460; }
-        .status-badge.approved { background: #d4edda; color: #155724; }
-        .shift-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .shift-1 { background: #e3f2fd; color: #0d47a1; }
-        .shift-2 { background: #fff3e0; color: #e65100; }
-        .shift-3 { background: #f3e5f5; color: #4a148c; }
-        .shift-leave { background: #fff3cd; color: #856404; }
-        .shift-mission { background: #d1ecf1; color: #0c5460; }
-        .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-        }
-        .modal.show { display: flex; }
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 16px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .modal-content h3 { color: #333; margin-bottom: 10px; }
-        .modal-content p { color: #666; font-size: 14px; margin-bottom: 15px; }
-        .modal-content input, .modal-content textarea, .modal-content select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 2px solid #e8ecf1;
-            border-radius: 10px;
-            font-size: 14px;
-            margin-bottom: 10px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-        }
-        .modal-content input:focus, .modal-content textarea:focus, .modal-content select:focus {
-            outline: none;
-            border-color: #1a73e8;
-        }
-        .modal-content .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .modal-content .btn-group button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 15px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            font-weight: 500;
-            min-width: 80px;
-        }
-        .btn-save { background: #1a73e8; color: white; }
-        .btn-save:hover { background: #1557b0; }
-        .btn-success { background: #34a853; color: white; }
-        .btn-success:hover { background: #1e7e34; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-danger:hover { background: #b02a37; }
-        .btn-cancel { background: #e8ecf1; color: #333; }
-        .btn-cancel:hover { background: #d5d8dd; }
-        .btn-get-location {
-            background: #34a853;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-        .btn-get-location:hover { background: #1e7e34; }
-        .location-info {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 13px;
-            color: #555;
-            margin-bottom: 10px;
-        }
-        .request-item {
-            background: #f8f9fa;
-            padding: 12px 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            border-left: 4px solid #ffc107;
-        }
-        .request-item .request-user { font-weight: 600; color: #333; }
-        .request-item .request-detail { font-size: 13px; color: #666; margin-top: 3px; }
-        .request-item .request-actions { margin-top: 8px; display: flex; gap: 8px; }
-        .request-item .request-actions button {
-            padding: 5px 15px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-        }
-        .request-item .request-actions .approve-btn {
-            background: #34a853;
-            color: white;
-        }
-        .request-item .request-actions .approve-btn:hover {
-            background: #1e7e34;
-        }
-        .request-item .request-actions .reject-btn {
-            background: #dc3545;
-            color: white;
-        }
-        .request-item .request-actions .reject-btn:hover {
-            background: #b02a37;
-        }
-        .status-message {
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            font-size: 14px;
-            display: none;
-        }
-        .status-message.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-            display: block;
-        }
-        .status-message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            display: block;
-        }
-        .status-message.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffc107;
-            display: block;
-        }
-        .status-message.danger {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            display: block;
-        }
-        .status-message.locked {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #dc3545;
-            display: block;
-            font-weight: 600;
-        }
-        .install-btn {
-            background: #34a853;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 6px 16px;
-            cursor: pointer;
-            font-size: 13px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            font-weight: 500;
-            display: none;
-            animation: pulse-green 2s infinite;
-        }
-        @keyframes pulse-green {
-            0% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(52, 168, 83, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); }
-        }
-        .install-btn:hover { background: #1e7e34; transform: scale(1.05); }
-        .summary-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 15px;
-        }
-        .summary-card {
-            background: white;
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-        .summary-card .card-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #f0f2f5;
-        }
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            border-bottom: 1px solid #f5f6f8;
-            font-size: 14px;
-        }
-        .summary-item .name { color: #333; }
-        .summary-item .value { font-weight: 600; color: #1a73e8; }
-        .summary-item .value.leave { color: #fbbc04; }
-        .summary-item .value.mission { color: #7c3aed; }
-        .summary-item .value.hours { color: #34a853; }
-        .deadline-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            background: #ff9800;
-            color: white;
-        }
-        .deadline-badge.active {
-            background: #4caf50;
-        }
-        .deadline-badge.inactive {
-            background: #9e9e9e;
-        }
-        .user-lock-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            background: #dc3545;
-            color: white;
-        }
-        .user-lock-badge.unlocked {
-            background: #4caf50;
-        }
-        .lock-banner {
-            background: linear-gradient(135deg, #dc3545, #b02a37);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 12px;
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .lock-banner.show { display: flex; }
-        .lock-banner .lock-icon { font-size: 24px; margin-right: 10px; }
-        .lock-banner .lock-text {
-            font-size: 16px;
-            font-weight: 500;
-            flex: 1;
-        }
-        .lock-banner .lock-time {
-            font-size: 13px;
-            opacity: 0.8;
-        }
-        .lock-banner .lock-btn {
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 13px;
-            font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
-            transition: all 0.3s;
-        }
-        .lock-banner .lock-btn:hover {
-            background: rgba(255,255,255,0.35);
-        }
-        .lock-banner.unlocked {
-            background: linear-gradient(135deg, #34a853, #1e7e34);
-        }
-        .user-lock-banner {
-            background: linear-gradient(135deg, #ff9800, #e65100);
-            color: white;
-            padding: 10px 16px;
-            border-radius: 12px;
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .user-lock-banner.show { display: flex; }
-        .user-lock-banner .lock-icon { font-size: 20px; margin-right: 8px; }
-        .user-lock-banner .lock-text {
-            font-size: 14px;
-            font-weight: 500;
-            flex: 1;
-        }
-        .user-lock-banner .lock-time {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-        @media (max-width: 900px) {
-            .header { flex-direction: column; align-items: center; gap: 12px; padding: 15px; }
-            .header-left h2 { font-size: 16px; text-align: center; }
-            .header-right { justify-content: center; }
-            .header-right .nav-btn { font-size: 12px; padding: 5px 12px; }
-            .header-right .user-name-btn { font-size: 12px; padding: 5px 12px; }
-            .header-right .logout-link { font-size: 12px; padding: 5px 12px; }
-        }
-        @media (max-width: 768px) {
-            .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-            .stat-card .number { font-size: 24px; }
-            .action-buttons { gap: 10px; }
-            .action-buttons .btn { padding: 12px 8px; font-size: 14px; min-height: 55px; }
-            .action-buttons .btn .icon { font-size: 22px; }
-            .summary-grid { grid-template-columns: 1fr; }
-            .lock-banner { flex-direction: column; text-align: center; }
-            .lock-banner .lock-text { font-size: 14px; }
-            .user-lock-banner { flex-direction: column; text-align: center; }
-            .user-lock-banner .lock-text { font-size: 13px; }
-        }
-        @media (max-width: 600px) {
-            .header-right .nav-btn { font-size: 11px; padding: 4px 10px; }
-            .header-right .user-name-btn { font-size: 11px; padding: 4px 10px; }
-            .header-right .logout-link { font-size: 11px; padding: 4px 10px; }
-            .action-buttons { gap: 8px; }
-            .action-buttons .btn { padding: 10px 6px; font-size: 13px; min-height: 50px; }
-            .action-buttons .btn .icon { font-size: 20px; }
-            .action-buttons .btn .sub-text { font-size: 10px; }
-        }
-        @media (max-width: 400px) {
-            .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
-            .stat-card .number { font-size: 20px; }
-            .action-buttons { gap: 6px; }
-            .action-buttons .btn { padding: 8px 5px; font-size: 12px; min-height: 45px; }
-            .action-buttons .btn .icon { font-size: 18px; }
-            .action-buttons .btn .sub-text { font-size: 9px; }
-        }
-    </style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif; 
+        background: #f0f2f5; 
+        padding: 0; 
+        margin: 0; 
+        min-height: 100vh; 
+        width: 100%;
+        overflow-x: hidden;
+    }
+    .container { 
+        max-width: 100%; 
+        margin: 0; 
+        padding: 0;
+        width: 100%;
+    }
+    .header {
+        background: linear-gradient(135deg, #1a73e8, #0d47a1);
+        color: white;
+        padding: 12px 25px;
+        border-radius: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+        width: 100%;
+    }
+    .header-left h2 { font-size: 18px; font-weight: 600; white-space: nowrap; }
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .header-right .nav-btn {
+        color: white;
+        text-decoration: none;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.3s;
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.15);
+        white-space: nowrap;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        cursor: pointer;
+    }
+    .header-right .nav-btn:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
+    .header-right .nav-btn.location-btn {
+        background: rgba(255, 193, 7, 0.3);
+        border-color: #ffc107;
+    }
+    .header-right .nav-btn.location-btn:hover { background: rgba(255, 193, 7, 0.5); }
+    .header-right .user-name-btn {
+        color: white;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.25);
+        white-space: nowrap;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        cursor: default;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .header-right .logout-link {
+        color: white;
+        text-decoration: none;
+        background: rgba(255,255,255,0.2);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        transition: all 0.3s;
+        font-weight: 500;
+        border: 1px solid rgba(255,255,255,0.15);
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+    }
+    .header-right .logout-link:hover { background: rgba(255,255,255,0.35); transform: scale(1.05); }
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+        padding: 0 15px;
+    }
+    .stat-card {
+        background: white;
+        padding: 18px 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        text-align: center;
+        transition: all 0.3s;
+    }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .stat-card .stat-icon { font-size: 28px; display: block; margin-bottom: 4px; }
+    .stat-card .number { font-size: 30px; font-weight: 700; color: #1a73e8; }
+    .stat-card .number.green { color: #34a853; }
+    .stat-card .number.orange { color: #fbbc04; }
+    .stat-card .number.purple { color: #7c3aed; }
+    .stat-card .label { font-size: 13px; color: #888; margin-top: 2px; }
+    .action-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding: 0 15px;
+    }
+    .action-buttons .btn {
+        padding: 14px 10px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 16px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        transition: all 0.3s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-weight: 500;
+        min-height: 65px;
+        color: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .action-buttons .btn .icon { font-size: 28px; }
+    .action-buttons .btn .sub-text { font-size: 12px; opacity: 0.85; font-weight: 400; }
+    .action-buttons .btn:hover { transform: translateY(-3px); box-shadow: 0 6px 25px rgba(0,0,0,0.15); }
+    .action-buttons .btn:active { transform: scale(0.95); }
+    .action-buttons .btn.disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+    .btn-checkin { background: linear-gradient(135deg, #34a853, #1e7e34); }
+    .btn-checkout { background: linear-gradient(135deg, #dc3545, #b02a37); }
+    .btn-leave { background: linear-gradient(135deg, #fbbc04, #e5a800); color: #333; }
+    .btn-mission { background: linear-gradient(135deg, #1a73e8, #0d47a1); }
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        overflow-x: auto;
+        margin: 0 15px 20px 15px;
+    }
+    .table-container .table-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .table-container .table-title .badge-count {
+        background: #1a73e8;
+        color: white;
+        padding: 2px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    table thead th {
+        background: #f8f9fa;
+        color: #555;
+        padding: 12px 15px;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        border-bottom: 2px solid #e8ecf1;
+        white-space: nowrap;
+    }
+    table tbody td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f0f2f5;
+        color: #333;
+        font-size: 14px;
+    }
+    table tbody tr:hover { background: #f8f9fa; }
+    .status-badge {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .status-badge.present { background: #e8f5e9; color: #2e7d32; }
+    .status-badge.outside { background: #ffebee; color: #c62828; }
+    .status-badge.working { background: #fff3cd; color: #856404; }
+    .status-badge.leave { background: #fff3cd; color: #856404; }
+    .status-badge.mission { background: #d1ecf1; color: #0c5460; }
+    .status-badge.approved { background: #d4edda; color: #155724; }
+    .shift-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .shift-1 { background: #e3f2fd; color: #0d47a1; }
+    .shift-2 { background: #fff3e0; color: #e65100; }
+    .shift-3 { background: #f3e5f5; color: #4a148c; }
+    .shift-leave { background: #fff3cd; color: #856404; }
+    .shift-mission { background: #d1ecf1; color: #0c5460; }
+    .footer { text-align: center; padding: 20px 0 5px; color: #aaa; font-size: 12px; }
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 16px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-content h3 { color: #333; margin-bottom: 10px; }
+    .modal-content p { color: #666; font-size: 14px; margin-bottom: 15px; }
+    .modal-content input, .modal-content textarea, .modal-content select {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid #e8ecf1;
+        border-radius: 10px;
+        font-size: 14px;
+        margin-bottom: 10px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+    }
+    .modal-content input:focus, .modal-content textarea:focus, .modal-content select:focus {
+        outline: none;
+        border-color: #1a73e8;
+    }
+    .modal-content .btn-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .modal-content .btn-group button {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 15px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        font-weight: 500;
+        min-width: 80px;
+    }
+    .btn-save { background: #1a73e8; color: white; }
+    .btn-save:hover { background: #1557b0; }
+    .btn-success { background: #34a853; color: white; }
+    .btn-success:hover { background: #1e7e34; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-danger:hover { background: #b02a37; }
+    .btn-cancel { background: #e8ecf1; color: #333; }
+    .btn-cancel:hover { background: #d5d8dd; }
+    .btn-get-location {
+        background: #34a853;
+        color: white;
+        padding: 10px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 14px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    .btn-get-location:hover { background: #1e7e34; }
+    .location-info {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #555;
+        margin-bottom: 10px;
+    }
+    .request-item {
+        background: #f8f9fa;
+        padding: 12px 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        border-left: 4px solid #ffc107;
+    }
+    .request-item .request-user { font-weight: 600; color: #333; }
+    .request-item .request-detail { font-size: 13px; color: #666; margin-top: 3px; }
+    .request-item .request-actions { margin-top: 8px; display: flex; gap: 8px; }
+    .request-item .request-actions button {
+        padding: 5px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+    }
+    .request-item .request-actions .approve-btn { background: #34a853; color: white; }
+    .request-item .request-actions .approve-btn:hover { background: #1e7e34; }
+    .request-item .request-actions .reject-btn { background: #dc3545; color: white; }
+    .request-item .request-actions .reject-btn:hover { background: #b02a37; }
+    .status-message {
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        font-size: 14px;
+        display: none;
+        margin: 0 15px 10px 15px;
+    }
+    .status-message.info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+        display: block;
+    }
+    .status-message.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+        display: block;
+    }
+    .status-message.warning {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffc107;
+        display: block;
+    }
+    .status-message.danger {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        display: block;
+    }
+    .status-message.locked {
+        background: #f8d7da;
+        color: #721c24;
+        border: 2px solid #dc3545;
+        display: block;
+        font-weight: 600;
+        margin: 0 15px 10px 15px;
+    }
+    .install-btn {
+        background: #34a853;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 6px 16px;
+        cursor: pointer;
+        font-size: 13px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        font-weight: 500;
+        display: none;
+        animation: pulse-green 2s infinite;
+    }
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(52, 168, 83, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); }
+    }
+    .install-btn:hover { background: #1e7e34; transform: scale(1.05); }
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 15px;
+        padding: 0 15px;
+    }
+    .summary-card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .summary-card .card-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #f0f2f5;
+    }
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #f5f6f8;
+        font-size: 14px;
+    }
+    .summary-item .name { color: #333; }
+    .summary-item .value { font-weight: 600; color: #1a73e8; }
+    .summary-item .value.leave { color: #fbbc04; }
+    .summary-item .value.mission { color: #7c3aed; }
+    .summary-item .value.hours { color: #34a853; }
+    .deadline-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #ff9800;
+        color: white;
+    }
+    .deadline-badge.active { background: #4caf50; }
+    .deadline-badge.inactive { background: #9e9e9e; }
+    .user-lock-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #dc3545;
+        color: white;
+    }
+    .user-lock-badge.unlocked { background: #4caf50; }
+    .lock-banner {
+        background: linear-gradient(135deg, #dc3545, #b02a37);
+        color: white;
+        padding: 12px 25px;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+        width: 100%;
+    }
+    .lock-banner .lock-icon { font-size: 24px; margin-right: 10px; }
+    .lock-banner .lock-text { font-size: 16px; font-weight: 500; flex: 1; }
+    .lock-banner .lock-time { font-size: 13px; opacity: 0.8; }
+    .lock-banner .lock-btn {
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 13px;
+        font-family: 'Khmer OS', 'Khmer OS Muol', 'Arial', sans-serif;
+        transition: all 0.3s;
+    }
+    .lock-banner .lock-btn:hover { background: rgba(255,255,255,0.35); }
+    .lock-banner.unlocked { background: linear-gradient(135deg, #34a853, #1e7e34); }
+    .user-lock-banner {
+        background: linear-gradient(135deg, #ff9800, #e65100);
+        color: white;
+        padding: 10px 25px;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+    .user-lock-banner.show { display: flex; }
+    .user-lock-banner .lock-icon { font-size: 20px; margin-right: 8px; }
+    .user-lock-banner .lock-text { font-size: 14px; font-weight: 500; flex: 1; }
+    .user-lock-banner .lock-time { font-size: 12px; opacity: 0.8; }
+
+    /* Responsive Design */
+    @media (max-width: 900px) {
+        .header { flex-direction: column; align-items: center; gap: 12px; padding: 15px; }
+        .header-left h2 { font-size: 16px; text-align: center; }
+        .header-right { justify-content: center; }
+        .header-right .nav-btn { font-size: 12px; padding: 5px 12px; }
+        .header-right .user-name-btn { font-size: 12px; padding: 5px 12px; }
+        .header-right .logout-link { font-size: 12px; padding: 5px 12px; }
+    }
+    @media (max-width: 768px) {
+        .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .stat-card .number { font-size: 24px; }
+        .action-buttons { gap: 10px; }
+        .action-buttons .btn { padding: 12px 8px; font-size: 14px; min-height: 55px; }
+        .action-buttons .btn .icon { font-size: 22px; }
+        .summary-grid { grid-template-columns: 1fr; }
+        .lock-banner { flex-direction: column; text-align: center; }
+        .lock-banner .lock-text { font-size: 14px; }
+        .user-lock-banner { flex-direction: column; text-align: center; }
+        .user-lock-banner .lock-text { font-size: 13px; }
+    }
+    @media (max-width: 600px) {
+        .header-right .nav-btn { font-size: 11px; padding: 4px 10px; }
+        .header-right .user-name-btn { font-size: 11px; padding: 4px 10px; }
+        .header-right .logout-link { font-size: 11px; padding: 4px 10px; }
+        .action-buttons { gap: 8px; }
+        .action-buttons .btn { padding: 10px 6px; font-size: 13px; min-height: 50px; }
+        .action-buttons .btn .icon { font-size: 20px; }
+        .action-buttons .btn .sub-text { font-size: 10px; }
+        .stats { padding: 0 10px; }
+        .action-buttons { padding: 0 10px; }
+        .table-container { margin: 0 10px 15px 10px; padding: 15px; }
+        .summary-grid { padding: 0 10px; }
+        .status-message { margin: 0 10px 10px 10px; }
+        .lock-banner, .user-lock-banner { padding: 10px 15px; }
+    }
+    @media (max-width: 400px) {
+        .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+        .stat-card .number { font-size: 20px; }
+        .action-buttons { gap: 6px; }
+        .action-buttons .btn { padding: 8px 5px; font-size: 12px; min-height: 45px; }
+        .action-buttons .btn .icon { font-size: 18px; }
+        .action-buttons .btn .sub-text { font-size: 9px; }
+    }
+</style>
 </head>
 <body>
     <div class="container">
