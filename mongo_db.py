@@ -538,7 +538,74 @@ def clean_missions_only():
     missions_col.delete_many({})
     increment_data_version()
     return True
+# mongo_db.py - បន្ថែមនៅក្នុងផ្នែក ATTENDANCE FUNCTIONS
 
+def get_all_attendance(limit=100):
+    """Get all attendance records"""
+    try:
+        return list(attendance_collection.find().sort('date', -1).limit(limit))
+    except Exception as e:
+        print(f"Error in get_all_attendance: {e}")
+        return []
+
+def get_attendance_by_id(attendance_id):
+    """Get attendance record by ID"""
+    try:
+        if isinstance(attendance_id, str):
+            attendance_id = ObjectId(attendance_id)
+        return attendance_collection.find_one({'_id': attendance_id})
+    except Exception as e:
+        print(f"Error in get_attendance_by_id: {e}")
+        return None
+
+def update_attendance(attendance_id, check_in=None, check_out=None, date=None, shift=None):
+    """Update attendance record"""
+    try:
+        if isinstance(attendance_id, str):
+            attendance_id = ObjectId(attendance_id)
+        update_data = {}
+        if check_in:
+            update_data['check_in'] = check_in
+        if check_out:
+            update_data['check_out'] = check_out
+        if date:
+            update_data['date'] = date
+        if shift:
+            update_data['shift'] = shift
+        if check_in and check_out:
+            check_in_dt = datetime.strptime(check_in, '%Y-%m-%d %H:%M:%S')
+            check_out_dt = datetime.strptime(check_out, '%Y-%m-%d %H:%M:%S')
+            update_data['total_hours'] = (check_out_dt - check_in_dt).total_seconds() / 3600
+        attendance_collection.update_one({'_id': attendance_id}, {'$set': update_data})
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in update_attendance: {e}")
+        return False
+
+def delete_attendance(attendance_id):
+    """Delete attendance record"""
+    try:
+        if isinstance(attendance_id, str):
+            attendance_id = ObjectId(attendance_id)
+        attendance_collection.delete_one({'_id': attendance_id})
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in delete_attendance: {e}")
+        return False
+
+def get_attendance_report(start_date, end_date):
+    """Get attendance report"""
+    try:
+        daily = list(attendance_collection.find({
+            'date': {'$gte': start_date, '$lte': end_date}
+        }).sort('date', -1))
+        return {'daily': daily, 'summary': []}
+    except Exception as e:
+        print(f"Error in get_attendance_report: {e}")
+        return {'daily': [], 'summary': []}
+        
 def clean_all_data():
     clean_attendance_only()
     clean_leaves_only()
