@@ -492,34 +492,6 @@ def add_user_route():
         return jsonify({'success': True, 'message': '✅ បានកំណត់ពាក្យសម្ងាត់ថ្មីជោគជ័យ!'})
     return jsonify({'success': False, 'message': '❌ មិនអាចកំណត់ពាក្យសម្ងាត់បាន!'})
 
-@app.route('/save_attendance_setting', methods=['POST'])
-def save_attendance_setting_route():
-    """Save attendance setting for user"""
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': 'មិនមានទិន្នន័យ!'})
-    
-    user_id = data.get('user_id')
-    check_in_deadline = data.get('check_in_deadline', '').strip()
-    is_active = data.get('is_active', 0)
-    
-    if not user_id:
-        return jsonify({'success': False, 'message': 'មិនមាន user_id!'})
-    
-    if check_in_deadline:
-        try:
-            datetime.strptime(check_in_deadline, '%H:%M')
-        except ValueError:
-            return jsonify({'success': False, 'message': 'ទ្រង់ទ្រាយម៉ោងមិនត្រឹមត្រូវ! សូមប្រើ HH:MM (ឧទាហរណ៍: 08:00)'})
-    
-    result = save_attendance_setting(user_id, check_in_deadline, int(is_active))
-    if result:
-        return jsonify({'success': True, 'message': '✅ រក្សាទុកការកំណត់ជោគជ័យ!'})
-    return jsonify({'success': False, 'message': '❌ មិនអាចរក្សាទុកបាន!'})
-
 @app.route('/toggle_user_lock', methods=['POST'])
 def toggle_user_lock_route():
     """Toggle user lock status"""
