@@ -1,4 +1,4 @@
-# mongo_db.py - Full MongoDB Connection File
+# mongo_db.py - Full MongoDB Connection File with Indexes
 import os
 from pymongo import MongoClient
 from datetime import datetime
@@ -19,7 +19,16 @@ else:
 DB_NAME = os.environ.get('DB_NAME', 'hr_system')
 
 try:
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=30000)
+    client = MongoClient(
+        MONGO_URI,
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=10000,
+        maxPoolSize=10,
+        minPoolSize=2,
+        retryWrites=True,
+        retryReads=True
+    )
     client.admin.command('ping')
     print("✅ Connected to MongoDB successfully!")
 except Exception as e:
@@ -69,6 +78,50 @@ def get_current_datetime_str():
 def get_current_time_only():
     """Get current time as string (HH:MM:SS)"""
     return get_current_time().strftime('%H:%M:%S')
+
+# ============================================================
+# CREATE INDEXES FOR FASTER QUERIES
+# ============================================================
+
+def create_indexes():
+    """Create indexes for faster queries"""
+    try:
+        # Users indexes
+        users_collection.create_index([('username', 1)], unique=True)
+        users_collection.create_index([('role', 1)])
+        
+        # Attendance indexes
+        attendance_collection.create_index([('user_id', 1), ('date', -1)])
+        attendance_collection.create_index([('date', -1)])
+        attendance_collection.create_index([('check_out', 1)])
+        attendance_collection.create_index([('shift', 1)])
+        
+        # Leaves indexes
+        leaves_collection.create_index([('user_id', 1), ('start_date', -1)])
+        leaves_collection.create_index([('status', 1)])
+        leaves_collection.create_index([('start_date', 1), ('end_date', 1)])
+        
+        # Missions indexes
+        missions_collection.create_index([('user_id', 1), ('start_date', -1)])
+        missions_collection.create_index([('status', 1)])
+        missions_collection.create_index([('start_date', 1), ('end_date', 1)])
+        
+        # Settings indexes
+        settings_collection.create_index([('_id', 1)])
+        
+        # Attendance settings indexes
+        attendance_settings_collection.create_index([('user_id', 1)], unique=True)
+        attendance_settings_collection.create_index([('is_active', 1)])
+        
+        # User attendance lock indexes
+        user_attendance_lock_collection.create_index([('user_id', 1)], unique=True)
+        user_attendance_lock_collection.create_index([('is_locked', 1)])
+        
+        print("✅ Indexes created successfully!")
+        return True
+    except Exception as e:
+        print(f"❌ Error creating indexes: {e}")
+        return False
 
 # ============================================================
 # INIT DATABASE
@@ -127,6 +180,9 @@ def init_db():
                 'updated_at': get_current_datetime_str()
             })
             print("✅ System lock initialized")
+
+        # Create indexes for faster queries
+        create_indexes()
 
         print("✅ MongoDB initialized successfully!")
         return True
@@ -632,19 +688,19 @@ def get_work_history_report(start_date=None, end_date=None, limit=200):
         # Get attendance records
         attendance_records = list(attendance_collection.find({
             'date': {'$gte': start_date, '$lte': end_date}
-        }).sort('date', -1))
+        }).sort('date', -1).limit(limit))
         
         # Get leave records
         leave_records = list(leaves_collection.find({
             'status': 'approved',
             'start_date': {'$gte': start_date, '$lte': end_date}
-        }).sort('start_date', -1))
+        }).sort('start_date', -1).limit(limit))
         
         # Get mission records
         mission_records = list(missions_collection.find({
             'status': 'approved',
             'start_date': {'$gte': start_date, '$lte': end_date}
-        }).sort('start_date', -1))
+        }).sort('start_date', -1).limit(limit))
         
         # Combine and format
         result = []
