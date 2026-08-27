@@ -478,6 +478,11 @@ def manage_users():
     if not session.get('logged_in') or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
     users = get_all_users()
+    
+    # ===== កែនៅទីនេះ! បន្ថែម 'id' ពី '_id' =====
+    for user in users:
+        user['id'] = str(user['_id'])  # បន្ថែម id សម្រាប់ប្រើក្នុង HTML
+    
     settings = get_all_attendance_settings()
     settings_dict = {s.get('user_id'): s for s in settings}
     user_locks = get_all_user_lock_status()
@@ -489,7 +494,6 @@ def manage_users():
                                    user_locks=user_locks_dict,
                                    message='',
                                    message_type='')
-
 @app.route('/get_user/<int:user_id>')
 def get_user(user_id):
     if not session.get('logged_in') or session.get('role') != 'admin':
