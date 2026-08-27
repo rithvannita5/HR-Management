@@ -6709,11 +6709,16 @@ REPORT_HTML = '''<!DOCTYPE html>
     </script>
 </body>
 </html>'''
-
 # ============================================================
 # MAIN
 # ============================================================
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    migrate_database()
+    
+    # ចាប់ផ្តើម Background Thread នៅទីនេះ បន្ទាប់ពី Database ត្រូវបានបង្កើតរួចរាល់
+    start_auto_lock_unlock_thread()
+    
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
