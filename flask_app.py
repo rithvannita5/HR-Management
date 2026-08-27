@@ -6,13 +6,12 @@ from flask import (
     url_for, flash, jsonify, session
 )
 
-# Import មុខងារទាំងអស់ចេញពី mongo_db.py
 import mongo_db as db
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'my_secret_key_attendance_2026')
 
-# បង្កើត Database Index ពេលចាប់ផ្ដើម App
+# Initialize DB Indexing
 db.init_db()
 
 
@@ -106,12 +105,10 @@ def dashboard():
 def check_in():
     user_id = session['user_id']
     
-    # ពិនិត្យ System Lock
     sys_ok, sys_msg = db.check_system_lock_for_user(user_id)
     if not sys_ok:
         return jsonify({"success": False, "message": sys_msg})
 
-    # ពិនិត្យ User Lock
     usr_ok, usr_msg = db.check_user_lock(user_id)
     if not usr_ok:
         return jsonify({"success": False, "message": usr_msg})
@@ -403,7 +400,6 @@ def clean_data():
 
 @app.route('/api/data-version')
 def get_data_version():
-    """ ប្រើសម្រាប់ឲ្យ Mobile ឬ Frontend ឆែកមើលថាមាន Data ថ្មីដែរឬទេ """
     return jsonify({"version": db.get_data_version()})
 
 
