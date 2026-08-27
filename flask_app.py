@@ -10,6 +10,71 @@ import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+# នៅដើមឯកសារ flask_app.py
+# ===== MONGODB CONNECTION =====
+# ពិនិត្យមើលថាតើប្រើ MongoDB ឬ SQLite
+USE_MONGODB = os.environ.get('MONGO_URI') is not None
+
+if USE_MONGODB:
+    print("✅ Using MongoDB")
+    from mongo_db import (
+        init_db,
+        get_data_version,
+        increment_data_version,
+        get_user_by_id,
+        get_user_by_username,
+        create_user,
+        update_user,
+        update_password,
+        verify_password,
+        delete_user,
+        get_all_users,
+        save_company_location,
+        get_company_location,
+        check_in,
+        check_out,
+        get_checkin_status,
+        get_system_lock_status,
+        update_system_lock,
+        toggle_system_lock,
+        get_user_lock_status,
+        update_user_lock,
+        get_all_user_lock_status,
+        get_attendance_stats,
+        get_all_attendance,
+        get_work_history_report,
+        get_monthly_summary_report,
+        get_attendance_setting,
+        save_attendance_setting,
+        get_all_attendance_settings,
+        create_leave,
+        get_pending_leaves,
+        approve_leave,
+        reject_leave,
+        create_mission,
+        get_pending_missions,
+        approve_mission,
+        reject_mission,
+        clean_all_data,
+        clean_attendance_only,
+        clean_leaves_only,
+        clean_missions_only,
+        get_current_date,
+        get_current_datetime,
+        get_current_time,
+        get_current_time_only,
+        get_current_datetime_str,
+        get_attendance_report,
+        get_attendance_by_id,
+        update_attendance,
+        delete_attendance,
+        get_company_location as get_company_location_db
+    )
+else:
+    print("⚠️ Using SQLite (local only)")
+    # SQLite functions (ទុកឲ្យដំណើរការដូចដើម)
+    from flask_app_original import *
+    
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here-change-it-to-something-secure-123456789'
 
