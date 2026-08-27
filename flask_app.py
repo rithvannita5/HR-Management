@@ -781,9 +781,90 @@ def export_excel():
     daily_data = result.get('daily', [])
     summary_data = result.get('summary', [])
     
-    # ... (Excel export code - same as your original) ...
-    # ចម្លងកូដ export_excel ពីកូដចាស់របស់អ្នកមកទីនេះ
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "ប្រចាំថ្ងៃ"
+    ws1.merge_cells('A1:H1')
+    ws1['A1'] = f"របាយការណ៍ប្រចាំថ្ងៃ\nចាប់ពី {start_date} ដល់ {end_date}"
+    ws1['A1'].font = Font(size=16, bold=True)
+    ws1['A1'].alignment = Alignment(horizontal='center')
+    headers = ['ល.រ', 'ឈ្មោះបុគ្គលិក', 'កាលបរិច្ឆេទ', 'ប្រភេទ', 'ចាប់ផ្តើម', 'បញ្ចប់', 'ចំនួន', 'ស្ថានភាព/ព័ត៌មាន']
+    for col, header in enumerate(headers, 1):
+        cell = ws1.cell(row=3, column=col, value=header)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill(start_color='1a73e8', end_color='1a73e8', fill_type='solid')
+        cell.alignment = Alignment(horizontal='center')
+    for row_idx, item in enumerate(daily_data, 4):
+        ws1.cell(row=row_idx, column=1, value=row_idx-3)
+        ws1.cell(row=row_idx, column=2, value=item.get('full_name', ''))
+        ws1.cell(row=row_idx, column=3, value=item.get('date', ''))
+        if item.get('type') == 'attendance':
+            ws1.cell(row=row_idx, column=4, value='វត្តមាន')
+        elif item.get('type') == 'leave':
+            ws1.cell(row=row_idx, column=4, value='ច្បាប់')
+        elif item.get('type') == 'mission':
+            ws1.cell(row=row_idx, column=4, value='បេសកម្ម')
+        else:
+            ws1.cell(row=row_idx, column=4, value='-')
+        if item.get('type') == 'attendance':
+            ws1.cell(row=row_idx, column=5, value=item.get('check_in', '')[:16] if item.get('check_in') else '')
+            ws1.cell(row=row_idx, column=6, value=item.get('check_out', '')[:16] if item.get('check_out') else '')
+            if item.get('total_hours'):
+                hours = int(item['total_hours'])
+                minutes = int((item['total_hours'] - hours) * 60)
+                ws1.cell(row=row_idx, column=7, value=f"{hours:02d}:{minutes:02d}")
+            else:
+                ws1.cell(row=row_idx, column=7, value='-')
+            if item.get('check_in') and item.get('check_out'):
+                ws1.cell(row=row_idx, column=8, value='បានបិទ')
+            elif item.get('check_in') and not item.get('check_out'):
+                ws1.cell(row=row_idx, column=8, value='កំពុងធ្វើការ')
+            else:
+                ws1.cell(row=row_idx, column=8, value='មិនទាន់ចូល')
+        else:
+            ws1.cell(row=row_idx, column=5, value=item.get('start_date', ''))
+            ws1.cell(row=row_idx, column=6, value=item.get('end_date', ''))
+            ws1.cell(row=row_idx, column=7, value=f"{item.get('days', 0)} ថ្ងៃ")
+            if item.get('type') == 'leave':
+                ws1.cell(row=row_idx, column=8, value=f"ច្បាប់: {item.get('reason', '')}")
+            else:
+                ws1.cell(row=row_idx, column=8, value=f"បេសកម្ម: {item.get('destination', '')}")
+    for col in range(1, 9):
+        ws1.column_dimensions[chr(64 + col)].width = 18
     
+    ws2 = wb.create_sheet("សង្ខេបប្រចាំខែ")
+    ws2.merge_cells('A1:H1')
+    ws2['A1'] = f"របាយការណ៍សង្ខេបប្រចាំខែ\nចាប់ពី {start_date} ដល់ {end_date}"
+    ws2['A1'].font = Font(size=16, bold=True)
+    ws2['A1'].alignment = Alignment(horizontal='center')
+    headers2 = ['ល.រ', 'ឈ្មោះបុគ្គលិក', 'ថ្ងៃធ្វើការ', 'ម៉ោងធ្វើការសរុប', 'វគ្គយប់', 'ម៉ោងយប់', 'ចំនួនថ្ងៃសុំច្បាប់', 'ចំនួនថ្ងៃបេសកម្ម']
+    for col, header in enumerate(headers2, 1):
+        cell = ws2.cell(row=3, column=col, value=header)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill(start_color='1a73e8', end_color='1a73e8', fill_type='solid')
+        cell.alignment = Alignment(horizontal='center')
+    for row_idx, item in enumerate(summary_data, 4):
+        ws2.cell(row=row_idx, column=1, value=row_idx-3)
+        ws2.cell(row=row_idx, column=2, value=item.get('full_name', ''))
+        ws2.cell(row=row_idx, column=3, value=item.get('days_worked', 0))
+        total_hours = item.get('total_hours', 0)
+        hours = int(total_hours)
+        minutes = int((total_hours - hours) * 60)
+        ws2.cell(row=row_idx, column=4, value=f"{hours:02d}:{minutes:02d}")
+        ws2.cell(row=row_idx, column=5, value=item.get('night_shifts', 0))
+        night_hours = item.get('night_hours', 0)
+        nhours = int(night_hours)
+        nminutes = int((night_hours - nhours) * 60)
+        ws2.cell(row=row_idx, column=6, value=f"{nhours:02d}:{nminutes:02d}")
+        ws2.cell(row=row_idx, column=7, value=item.get('total_leave_days', 0))
+        ws2.cell(row=row_idx, column=8, value=item.get('total_mission_days', 0))
+    for col in range(1, 9):
+        ws2.column_dimensions[chr(64 + col)].width = 20
+    
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = f"របាយការណ៍_{start_date}_ដល់_{end_date}.xlsx"
     return send_file(output, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.route('/check_auto_unlock')
@@ -836,7 +917,41 @@ def manifest():
 
 @app.route('/static/sw.js')
 def service_worker():
-    return '''...''' # same as your original
+    sw_code = '''
+const CACHE_NAME = 'hr-system-v1';
+const ASSETS = ['/', '/dashboard', '/static/manifest.json'];
+self.addEventListener('install', function(e) {
+    e.waitUntil(caches.open(CACHE_NAME).then(function(cache) {
+        return cache.addAll(ASSETS);
+    }).then(function() {
+        return self.skipWaiting();
+    }));
+});
+self.addEventListener('activate', function(e) {
+    e.waitUntil(caches.keys().then(function(cacheNames) {
+        return Promise.all(cacheNames.filter(function(name) {
+            return name !== CACHE_NAME;
+        }).map(function(name) {
+            return caches.delete(name);
+        }));
+    }).then(function() {
+        return self.clients.claim();
+    }));
+});
+self.addEventListener('fetch', function(e) {
+    e.respondWith(caches.match(e.request).then(function(response) {
+        return response || fetch(e.request).then(function(fetchResponse) {
+            return caches.open(CACHE_NAME).then(function(cache) {
+                cache.put(e.request, fetchResponse.clone());
+                return fetchResponse;
+            });
+        });
+    }).catch(function() {
+        return new Response('Offline', {status: 503, statusText: 'Service Unavailable'});
+    }));
+});
+    '''
+    return sw_code, 200, {'Content-Type': 'application/javascript'}
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -844,11 +959,95 @@ def static_files(filename):
 
 @app.route('/edit_attendance/<int:attendance_id>', methods=['GET', 'POST'])
 def edit_attendance(attendance_id):
-    # ... same as your original ...
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+    attendance = get_attendance_by_id(attendance_id)
+    if not attendance:
+        return "មិនមានទិន្នន័យ", 404
+    if request.method == 'POST':
+        check_in_date = request.form.get('check_in_date')
+        check_in_time = request.form.get('check_in_time')
+        check_out_date = request.form.get('check_out_date')
+        check_out_time = request.form.get('check_out_time')
+        shift = request.form.get('shift')
+        check_in_full = None
+        check_out_full = None
+        if check_in_date and check_in_time:
+            check_in_full = f"{check_in_date} {check_in_time}:00"
+        if check_out_date and check_out_time:
+            check_out_full = f"{check_out_date} {check_out_time}:00"
+        result = update_attendance(attendance_id, check_in_full, check_out_full, check_in_date, shift)
+        if result:
+            return redirect(url_for('dashboard'))
+        else:
+            return "មិនអាចកែប្រែបាន!", 500
+    # ចម្លង edit_form_html ពីកូដចាស់របស់អ្នក
+    edit_form_html = '''<!DOCTYPE html>
+<html>
+<head><title>កែប្រែទិន្នន័យវត្តមាន</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Khmer OS', 'Arial', sans-serif; background: #f0f2f5; padding: 20px; }
+.container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+h2 { color: #1a73e8; margin-bottom: 20px; }
+.info { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+.info p { margin: 5px 0; }
+label { display: block; margin: 12px 0 5px; font-weight: 600; color: #555; }
+input, select { width: 100%; padding: 10px 14px; border: 2px solid #e8ecf1; border-radius: 8px; font-size: 14px; font-family: 'Khmer OS', 'Arial', sans-serif; }
+input:focus, select:focus { outline: none; border-color: #1a73e8; }
+.btn-group { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+.btn-save { flex: 1; background: #1a73e8; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: 'Khmer OS', 'Arial', sans-serif; }
+.btn-save:hover { background: #1557b0; }
+.btn-cancel { flex: 1; background: #dc3545; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: 'Khmer OS', 'Arial', sans-serif; text-decoration: none; text-align: center; }
+.btn-cancel:hover { background: #b02a37; }
+.hint { font-size: 12px; color: #888; margin-top: 3px; }
+@media (max-width: 600px) { .container { padding: 20px; } .btn-group { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="container">
+    <h2>✏️ កែប្រែទិន្នន័យវត្តមាន</h2>
+    <div class="info">
+        <p><strong>ឈ្មោះបុគ្គលិក:</strong> {{ attendance.full_name }}</p>
+        <p><strong>ឈ្មោះអ្នកប្រើ:</strong> {{ attendance.username }}</p>
+    </div>
+    <form method="POST">
+        <label>📅 កាលបរិច្ឆេទចូល</label>
+        <input type="date" name="check_in_date" value="{{ attendance.date }}" required>
+        <label>⏰ ម៉ោងចូល</label>
+        <input type="time" name="check_in_time" value="{{ attendance.check_in.split(' ')[1][:5] if attendance.check_in else '' }}">
+        <label>📅 កាលបរិច្ឆេទចេញ</label>
+        <input type="date" name="check_out_date" value="{{ attendance.check_out.split(' ')[0] if attendance.check_out else attendance.date }}">
+        <label>⏰ ម៉ោងចេញ</label>
+        <input type="time" name="check_out_time" value="{{ attendance.check_out.split(' ')[1][:5] if attendance.check_out else '' }}">
+        <div class="hint">💡 សម្រាប់វគ្គយប់ ប្រសិនបើចេញព្រឹកថ្ងៃបន្ទាប់ សូមកំណត់កាលបរិច្ឆេទចេញជាថ្ងៃបន្ទាប់</div>
+        <label>វគ្គ</label>
+        <select name="shift">
+            <option value="1" {% if attendance.shift == 1 %}selected{% endif %}>វគ្គ 1 (ព្រឹក 07:00-11:00)</option>
+            <option value="2" {% if attendance.shift == 2 %}selected{% endif %}>វគ្គ 2 (រសៀល 13:00-17:00)</option>
+            <option value="3" {% if attendance.shift == 3 %}selected{% endif %}>វគ្គ 3 (យប់ 18:00-08:00)</option>
+        </select>
+        <div class="btn-group">
+            <button type="submit" class="btn-save">💾 រក្សាទុក</button>
+            <a href="/dashboard" class="btn-cancel">❌ បោះបង់</a>
+        </div>
+    </form>
+</div>
+</body>
+</html>'''
+    return render_template_string(edit_form_html, attendance=attendance)
 
 @app.route('/delete_attendance/<int:attendance_id>', methods=['POST'])
 def delete_attendance_route(attendance_id):
-    # ... same as your original ...
+   if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'អ្នកមិនមែនជា Admin!'})
+
+    result = delete_attendance(attendance_id)
+    if result:
+        return jsonify({'success': True, 'message': '✅ លុបទិន្នន័យជោគជ័យ!'})
+    else:
+        return jsonify({'success': False, 'message': '❌ មិនអាចលុបទិន្នន័យបាន!'})
 
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
@@ -856,7 +1055,346 @@ def uploaded_file(filename):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # ... same as your original ...
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = get_user_by_username(username)
+        if user and user['password'] == password:
+            session['logged_in'] = True
+            session['username'] = username
+            session['user_id'] = user['id']
+            session['role'] = user['role']
+            session['full_name'] = user['full_name']
+            return redirect(url_for('dashboard'))
+        else:
+            return '''
+            <!DOCTYPE html>
+            <html>
+            <head><title>កំហុស</title><meta charset="UTF-8">
+            <style>
+                body { font-family:'Khmer OS',Arial; text-align:center; padding:50px; background:#f0f2f5; }
+                .box { background:white; padding:40px; border-radius:16px; max-width:400px; margin:0 auto; box-shadow:0 4px 20px rgba(0,0,0,0.08); }
+                h3 { color:#dc3545; }
+                .back-link { display:inline-block; margin-top:20px; color:#1a73e8; text-decoration:none; padding:10px 25px; border:2px solid #1a73e8; border-radius:10px; }
+                .back-link:hover { background:#1a73e8; color:white; }
+            </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h3>❌ ឈ្មោះអ្នកប្រើ ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ!</h3>
+                    <a href="/login" class="back-link">← ត្រលប់មកវិញ</a>
+                </div>
+            </body>
+            </html>
+            '''
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ចូលប្រើប្រព័ន្ធ</title>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HR System">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            width: 100%;
+            font-family: 'Khmer OS', Arial, sans-serif;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            padding: 15px;
+            background: #ffffff;
+        }
+        .login-box {
+            width: 100%;
+            height: 100%;
+            max-width: 480px;
+            max-height: 600px;
+            background: #ffffff;
+            padding: 40px 30px;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+            border: 1px solid #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            animation: fadeInUp 0.5s ease;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .logo-icon {
+            text-align: center;
+            font-size: 65px;
+            margin-bottom: 8px;
+        }
+        .login-box h2 {
+            text-align: center;
+            color: #1a1a2e;
+            font-size: 30px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .login-box .sub-title {
+            text-align: center;
+            color: #888;
+            font-size: 15px;
+            margin-bottom: 28px;
+        }
+        .login-box .form-group {
+            margin-bottom: 16px;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 16px 18px;
+            border: 2px solid #e8ecf1;
+            border-radius: 14px;
+            font-size: 17px;
+            box-sizing: border-box;
+            font-family: 'Khmer OS', Arial, sans-serif;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        .login-box input:focus {
+            outline: none;
+            border-color: #1a73e8;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.08);
+        }
+        .login-box button {
+            width: 100%;
+            padding: 16px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Khmer OS', Arial, sans-serif;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-top: 4px;
+        }
+        .login-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(26, 115, 232, 0.35);
+        }
+        .login-box button:active { transform: scale(0.98); }
+        .login-box .hint {
+            text-align: center;
+            margin-top: 16px;
+            color: #999;
+            font-size: 13px;
+        }
+        .login-box .hint b { color: #1a73e8; }
+        .login-box .footer-text {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+            color: #ccc;
+            font-size: 12px;
+        }
+        @media (max-width: 600px) {
+            .login-box {
+                padding: 30px 22px;
+                border-radius: 18px;
+                max-height: none;
+            }
+            .login-box h2 {
+                font-size: 26px;
+            }
+            .login-box input {
+                padding: 15px 16px;
+                font-size: 16px;
+            }
+            .login-box button {
+                padding: 15px;
+                font-size: 17px;
+            }
+            .logo-icon {
+                font-size: 55px;
+            }
+        }
+        @media (max-width: 400px) {
+            .login-container {
+                padding: 10px;
+            }
+            .login-box {
+                padding: 22px 16px;
+                border-radius: 14px;
+            }
+            .login-box h2 {
+                font-size: 22px;
+            }
+            .login-box input {
+                padding: 13px 14px;
+                font-size: 15px;
+            }
+            .login-box button {
+                padding: 13px;
+                font-size: 16px;
+            }
+            .logo-icon {
+                font-size: 45px;
+            }
+            .login-box .sub-title {
+                font-size: 13px;
+                margin-bottom: 20px;
+            }
+        }
+        @media (max-height: 600px) {
+            .login-box {
+                padding: 20px 20px;
+            }
+            .logo-icon {
+                font-size: 40px;
+                margin-bottom: 4px;
+            }
+            .login-box h2 {
+                font-size: 22px;
+                margin-bottom: 2px;
+            }
+            .login-box .sub-title {
+                font-size: 13px;
+                margin-bottom: 16px;
+            }
+            .login-box .form-group {
+                margin-bottom: 10px;
+            }
+            .login-box input {
+                padding: 12px 14px;
+                font-size: 15px;
+            }
+            .login-box button {
+                padding: 12px;
+                font-size: 16px;
+            }
+            .login-box .hint {
+                margin-top: 10px;
+                font-size: 12px;
+            }
+            .login-box .footer-text {
+                margin-top: 12px;
+                padding-top: 10px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo-icon">🏢</div>
+            <h2 style="font-family: 'Khmer', 'Khmer OS Muol Light', 'Khmer OS', Arial, sans-serif; font-weight: 300; color: #1a73e8;">ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</h2>
+            <div class="sub-title">សូមបញ្ចូលឈ្មោះ និងពាក្យសម្ងាត់</div>
+            <form method="POST" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                <div class="form-group">
+                    <input type="text" name="username" placeholder="ឈ្មោះអ្នកប្រើ" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="ពាក្យសម្ងាត់" required>
+                </div>
+                <button type="submit">🔐 Login</button>
+            </form>
+            <div class="hint"><b>ពត៌មានបន្ថែមៈ ទំនាក់ទំនងលោក YEN SONY</b></div>
+            <div class="hint"><b>ទូរស័ព្ទ៖ +855 92 740 067</b></div>
+            <div class="footer-text">© 2026 ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក</div>
+        </div>
+    </div>
+    <script>
+        let deferredPrompt;
+        const installBtn = document.createElement('button');
+        installBtn.id = 'pwaInstallBtn';
+        installBtn.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #34a853;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 30px;
+            font-size: 16px;
+            font-family: 'Khmer OS', Arial, sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(52, 168, 83, 0.4);
+            z-index: 9999;
+            display: none;
+            animation: slideUp 0.5s ease;
+        `;
+        installBtn.innerHTML = '📲 ដំឡើងកម្មវិធី';
+        document.body.appendChild(installBtn);
+
+        const stylePwa = document.createElement('style');
+        stylePwa.textContent = `
+            @keyframes slideUp {
+                from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+                to { transform: translateX(-50%) translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(stylePwa);
+
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', function() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function(choiceResult) {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                        installBtn.style.display = 'none';
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        });
+
+        window.addEventListener('appinstalled', function() {
+            console.log('App installed successfully!');
+            installBtn.style.display = 'none';
+        });
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+            .then(function(reg) {
+                console.log('Service Worker registered successfully!');
+            })
+            .catch(function(err) {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            installBtn.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
+'''
 
 @app.route('/logout')
 def logout():
