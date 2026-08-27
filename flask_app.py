@@ -11,6 +11,30 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
 # ============================================================
+# CACHE - បន្ថែមនៅទីនេះ!
+# ============================================================
+
+cache = {}
+CACHE_DURATION = 30  # 30 seconds (កំណត់តាមចិត្ត)
+
+def get_cached(key, func, *args, **kwargs):
+    """Get data from cache or execute function"""
+    cache_key = f"{key}_{str(args)}_{str(kwargs)}"
+    if cache_key in cache:
+        data, timestamp = cache[cache_key]
+        if time.time() - timestamp < CACHE_DURATION:
+            return data
+    data = func(*args, **kwargs)
+    cache[cache_key] = (data, time.time())
+    return data
+
+def clear_cache():
+    """Clear all cache"""
+    global cache
+    cache = {}
+    print("✅ Cache cleared!")
+
+# ============================================================
 # MONGODB CONNECTION
 # ============================================================
 
