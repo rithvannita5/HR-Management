@@ -1,4 +1,4 @@
-# mongo_db.py
+# mongo_db.py - Full MongoDB Connection File
 import os
 from pymongo import MongoClient
 from datetime import datetime
@@ -13,15 +13,19 @@ MONGO_URI = os.environ.get('MONGO_URI')
 if not MONGO_URI:
     MONGO_URI = 'mongodb://localhost:27017/'
     print("⚠️ Using local MongoDB (no MONGO_URI set)")
+else:
+    print(f"✅ MONGO_URI found: {MONGO_URI[:30]}...")
 
 DB_NAME = os.environ.get('DB_NAME', 'hr_system')
 
 try:
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    # Test connection
     client.admin.command('ping')
     print("✅ Connected to MongoDB successfully!")
 except Exception as e:
     print(f"❌ MongoDB connection error: {e}")
+    print("⚠️ Falling back to localhost...")
     client = MongoClient('mongodb://localhost:27017/')
 
 db = client[DB_NAME]
@@ -37,18 +41,31 @@ data_version_collection = db['data_version']
 attendance_settings_collection = db['attendance_settings']
 user_attendance_lock_collection = db['user_attendance_lock']
 
+# Cambodia Timezone
 CAMBODIA_TZ = pytz.timezone('Asia/Phnom_Penh')
 
+# ============================================================
+# TIME FUNCTIONS
+# ============================================================
+
 def get_current_time():
+    """Get current datetime as datetime object"""
     return datetime.now(CAMBODIA_TZ)
 
 def get_current_date():
+    """Get current date as string (YYYY-MM-DD)"""
     return get_current_time().strftime('%Y-%m-%d')
 
+def get_current_datetime():
+    """Get current datetime as datetime object (alias)"""
+    return get_current_time()
+
 def get_current_datetime_str():
+    """Get current datetime as string (YYYY-MM-DD HH:MM:SS)"""
     return get_current_time().strftime('%Y-%m-%d %H:%M:%S')
 
 def get_current_time_only():
+    """Get current time as string (HH:MM:SS)"""
     return get_current_time().strftime('%H:%M:%S')
 
 # ============================================================
@@ -56,7 +73,9 @@ def get_current_time_only():
 # ============================================================
 
 def init_db():
+    """Initialize MongoDB with default data"""
     try:
+        # Check if admin exists
         admin = users_collection.find_one({'username': 'admin'})
         if not admin:
             users_collection.insert_one({
@@ -70,6 +89,7 @@ def init_db():
             })
             print("✅ Created admin user: admin / 1234")
 
+        # Check if test user exists
         test_user = users_collection.find_one({'username': 'user1'})
         if not test_user:
             users_collection.insert_one({
@@ -83,6 +103,7 @@ def init_db():
             })
             print("✅ Created test user: user1 / 1234")
 
+        # Check if data version exists
         version = data_version_collection.find_one({'_id': 'version'})
         if not version:
             data_version_collection.insert_one({
@@ -91,6 +112,7 @@ def init_db():
             })
             print("✅ Data version initialized")
 
+        # Check if system lock exists
         lock = settings_collection.find_one({'_id': 'system_lock'})
         if not lock:
             settings_collection.insert_one({
@@ -111,10 +133,11 @@ def init_db():
         return False
 
 # ============================================================
-# DATA VERSION
+# DATA VERSION FUNCTIONS
 # ============================================================
 
 def get_data_version():
+    """Get current data version"""
     try:
         version = data_version_collection.find_one({'_id': 'version'})
         return version['version'] if version else 1
@@ -123,6 +146,7 @@ def get_data_version():
         return 1
 
 def increment_data_version():
+    """Increment data version (call when data changes)"""
     try:
         data_version_collection.update_one(
             {'_id': 'version'},
@@ -139,6 +163,7 @@ def increment_data_version():
 # ============================================================
 
 def get_user_by_id(user_id):
+    """Get user by ID"""
     try:
         if isinstance(user_id, str):
             user_id = ObjectId(user_id)
@@ -148,6 +173,7 @@ def get_user_by_id(user_id):
         return None
 
 def get_user_by_username(username):
+    """Get user by username"""
     try:
         return users_collection.find_one({'username': username})
     except Exception as e:
@@ -155,10 +181,12 @@ def get_user_by_username(username):
         return None
 
 def create_user(username, password, full_name, email=None, phone=None, role='user'):
+    """Create new user"""
     try:
         existing = users_collection.find_one({'username': username})
         if existing:
             return False
+        
         users_collection.insert_one({
             'username': username,
             'password': password,
@@ -175,15 +203,19 @@ def create_user(username, password, full_name, email=None, phone=None, role='use
         return False
 
 def update_user(user_id, username, full_name, email, phone, role):
+    """Update user information"""
     try:
         if isinstance(user_id, str):
             user_id = ObjectId(user_id)
+        
+        # Check if username already exists for other user
         existing = users_collection.find_one({
             'username': username,
             '_id': {'$ne': user_id}
         })
         if existing:
             return False
+        
         users_collection.update_one(
             {'_id': user_id},
             {'$set': {
@@ -201,6 +233,7 @@ def update_user(user_id, username, full_name, email, phone, role):
         return False
 
 def update_password(user_id, new_password):
+    """Update user password"""
     try:
         if isinstance(user_id, str):
             user_id = ObjectId(user_id)
@@ -215,6 +248,7 @@ def update_password(user_id, new_password):
         return False
 
 def verify_password(user_id, password):
+    """Verify password"""
     try:
         if isinstance(user_id, str):
             user_id = ObjectId(user_id)
@@ -225,6 +259,7 @@ def verify_password(user_id, password):
         return False
 
 def delete_user(user_id):
+    """Delete user and all related data"""
     try:
         if isinstance(user_id, str):
             user_id = ObjectId(user_id)
@@ -239,13 +274,19 @@ def delete_user(user_id):
         return False
 
 def get_all_users():
+    """Get all users"""
     try:
         return list(users_collection.find().sort('created_at', -1))
     except Exception as e:
         print(f"Error in get_all_users: {e}")
         return []
 
+# ============================================================
+# USER LOCK FUNCTIONS
+# ============================================================
+
 def get_user_lock_status(user_id):
+    """Get user lock status"""
     try:
         lock = user_attendance_lock_collection.find_one({'user_id': str(user_id)})
         if lock:
@@ -256,6 +297,7 @@ def get_user_lock_status(user_id):
         return {'is_locked': 0, 'auto_unlock_time': None}
 
 def update_user_lock(user_id, is_locked, auto_unlock_time=None, locked_by=None):
+    """Update user lock"""
     try:
         current_time = get_current_datetime_str()
         update_data = {
@@ -283,6 +325,7 @@ def update_user_lock(user_id, is_locked, auto_unlock_time=None, locked_by=None):
         return False
 
 def get_all_user_lock_status():
+    """Get all user lock status"""
     try:
         users = list(users_collection.find({'role': {'$ne': 'admin'}}))
         locks = list(user_attendance_lock_collection.find({}))
@@ -306,13 +349,36 @@ def get_all_user_lock_status():
         print(f"Error in get_all_user_lock_status: {e}")
         return []
 
+def toggle_user_lock(user_id, lock_state, auto_unlock_time=None, locked_by=None):
+    """Toggle user lock"""
+    if lock_state == 1:
+        return update_user_lock(user_id, 1, auto_unlock_time, locked_by)
+    else:
+        return update_user_lock(user_id, 0, locked_by=locked_by)
+
+def check_user_lock(user_id):
+    """Check if user is locked"""
+    lock = get_user_lock_status(user_id)
+    if lock.get('is_locked', 0) != 1:
+        return True, None
+    auto_unlock = lock.get('auto_unlock_time')
+    if auto_unlock:
+        current_time = get_current_time_only()
+        current_hhmm = current_time[:5]
+        if current_hhmm >= auto_unlock:
+            update_user_lock(user_id, 0)
+            increment_data_version()
+            return True, None
+    return False, "⛔ អ្នកត្រូវបានបិទការចូលធ្វើការដោយ Admin! សូមទាក់ទង Admin!"
+
 # ============================================================
-# COMPANY LOCATION
+# COMPANY LOCATION FUNCTIONS
 # ============================================================
 
 def save_company_location(lat, lng, address=None):
+    """Save company location"""
     try:
-        company_location_collection.delete_many({})
+        company_location_collection.delete_many({})  # Clear old location
         company_location_collection.insert_one({
             'lat': lat,
             'lng': lng,
@@ -326,6 +392,7 @@ def save_company_location(lat, lng, address=None):
         return False
 
 def get_company_location():
+    """Get company location"""
     try:
         return company_location_collection.find_one({})
     except Exception as e:
@@ -337,6 +404,7 @@ def get_company_location():
 # ============================================================
 
 def get_checkin_status(user_id):
+    """Get user's check-in status"""
     try:
         record = attendance_collection.find_one({
             'user_id': str(user_id),
@@ -355,10 +423,12 @@ def get_checkin_status(user_id):
         return {'has_checkin': False, 'check_in_time': None, 'shift': None}
 
 def check_in(user_id, lat, lng, distance, shift):
+    """Check in with shift selection"""
     try:
         date = get_current_date()
         check_in_time = get_current_datetime_str()
         
+        # Check if already checked in for this shift today
         existing = attendance_collection.find_one({
             'user_id': str(user_id),
             'date': date,
@@ -390,9 +460,11 @@ def check_in(user_id, lat, lng, distance, shift):
         return False, f"កំហុស: {e}"
 
 def check_out(user_id, lat, lng, distance):
+    """Check out"""
     try:
         check_out_time = get_current_datetime_str()
         
+        # Find current check-in
         record = attendance_collection.find_one({
             'user_id': str(user_id),
             'check_out': None
@@ -401,13 +473,14 @@ def check_out(user_id, lat, lng, distance):
         if not record:
             return False, "មិនមានការចូលធ្វើការដែលមិនទាន់ចេញ!"
         
-        from datetime import datetime
+        # Calculate total hours
         check_in_dt = datetime.strptime(record['check_in'], '%Y-%m-%d %H:%M:%S')
         check_out_dt = datetime.strptime(check_out_time, '%Y-%m-%d %H:%M:%S')
         
         total_seconds = (check_out_dt - check_in_dt).total_seconds()
         total_hours = total_seconds / 3600
         
+        # Adjust for night shift
         if total_hours < 0:
             total_hours += 24
         
@@ -434,6 +507,7 @@ def check_out(user_id, lat, lng, distance):
         return False, f"កំហុស: {e}"
 
 def get_attendance_stats():
+    """Get attendance statistics"""
     try:
         today = get_current_date()
         total_users = users_collection.count_documents({'role': {'$ne': 'admin'}})
@@ -463,6 +537,7 @@ def get_attendance_stats():
         return {'total_users': 0, 'present_today': 0, 'leave_today': 0, 'mission_today': 0}
 
 def get_all_attendance(limit=100):
+    """Get all attendance records"""
     try:
         return list(attendance_collection.find().sort('date', -1).limit(limit))
     except Exception as e:
@@ -470,6 +545,7 @@ def get_all_attendance(limit=100):
         return []
 
 def get_work_history_report(start_date=None, end_date=None, limit=200):
+    """Get work history report"""
     try:
         if not start_date:
             today = datetime.now()
@@ -477,33 +553,52 @@ def get_work_history_report(start_date=None, end_date=None, limit=200):
         if not end_date:
             end_date = datetime.now().strftime('%Y-%m-%d')
         
+        # Get attendance records
         attendance_records = list(attendance_collection.find({
             'date': {'$gte': start_date, '$lte': end_date}
         }).sort('date', -1))
         
+        # Get leave records
         leave_records = list(leaves_collection.find({
             'status': 'approved',
             'start_date': {'$gte': start_date, '$lte': end_date}
         }).sort('start_date', -1))
         
+        # Get mission records
         mission_records = list(missions_collection.find({
             'status': 'approved',
             'start_date': {'$gte': start_date, '$lte': end_date}
         }).sort('start_date', -1))
         
-        return attendance_records + leave_records + mission_records
+        # Combine and format
+        result = []
+        for record in attendance_records:
+            record['type'] = 'attendance'
+            result.append(record)
+        for record in leave_records:
+            record['type'] = 'leave'
+            result.append(record)
+        for record in mission_records:
+            record['type'] = 'mission'
+            result.append(record)
+        
+        result.sort(key=lambda x: x.get('date', x.get('start_date', '')), reverse=True)
+        return result[:limit]
     except Exception as e:
         print(f"Error in get_work_history_report: {e}")
         return []
 
 def get_monthly_summary_report(start_date, end_date):
+    """Get monthly summary report"""
     try:
+        # Get all non-admin users
         users = list(users_collection.find({'role': {'$ne': 'admin'}}))
         
         result = []
         for user in users:
             user_id = str(user['_id'])
             
+            # Get attendance summary
             attendance = list(attendance_collection.aggregate([
                 {
                     '$match': {
@@ -522,6 +617,7 @@ def get_monthly_summary_report(start_date, end_date):
                 }
             ]))
             
+            # Get leave summary
             leaves = list(leaves_collection.aggregate([
                 {
                     '$match': {
@@ -538,6 +634,7 @@ def get_monthly_summary_report(start_date, end_date):
                 }
             ]))
             
+            # Get mission summary
             missions = list(missions_collection.aggregate([
                 {
                     '$match': {
@@ -558,11 +655,22 @@ def get_monthly_summary_report(start_date, end_date):
             lev = leaves[0] if leaves else {}
             mis = missions[0] if missions else {}
             
+            total_hours = att.get('total_hours', 0)
+            if total_hours < 0:
+                total_hours = abs(total_hours)
+                sign = "-"
+            else:
+                sign = ""
+            hours = int(total_hours)
+            minutes = int((total_hours - hours) * 60)
+            
             result.append({
                 'id': user_id,
                 'full_name': user['full_name'],
                 'days_worked': att.get('days_worked', 0),
                 'total_hours': att.get('total_hours', 0),
+                'total_hours_formatted': f"{sign}{hours:02d}:{minutes:02d}",
+                'days_worked_display': f"{att.get('days_worked', 0)} ថ្ងៃ",
                 'night_shifts': att.get('night_shifts', 0),
                 'night_hours': att.get('night_hours', 0),
                 'total_leave_days': lev.get('total_leave_days', 0),
@@ -575,10 +683,11 @@ def get_monthly_summary_report(start_date, end_date):
         return []
 
 # ============================================================
-# SYSTEM LOCK
+# SYSTEM LOCK FUNCTIONS
 # ============================================================
 
 def get_system_lock_status():
+    """Get system lock status"""
     try:
         lock = settings_collection.find_one({'_id': 'system_lock'})
         if lock:
@@ -596,6 +705,7 @@ def get_system_lock_status():
         return {'is_locked': 0, 'auto_unlock_time': '06:00'}
 
 def update_system_lock(is_locked, lock_start_time=None, lock_end_time=None, auto_unlock_time=None, locked_by=None):
+    """Update system lock"""
     try:
         update_data = {
             'is_locked': is_locked,
@@ -622,6 +732,7 @@ def update_system_lock(is_locked, lock_start_time=None, lock_end_time=None, auto
         return False
 
 def toggle_system_lock(lock_state, auto_unlock_time=None, locked_by=None):
+    """Toggle system lock"""
     current_time = get_current_datetime_str()
     if lock_state == 1:
         return update_system_lock(
@@ -637,11 +748,81 @@ def toggle_system_lock(lock_state, auto_unlock_time=None, locked_by=None):
             locked_by=locked_by
         )
 
+def check_system_lock_for_user(user_id):
+    """Check if system is locked for user"""
+    lock = get_system_lock_status()
+    if lock.get('is_locked', 0) != 1:
+        return True, None
+    auto_unlock = lock.get('auto_unlock_time')
+    if auto_unlock:
+        current_time = get_current_time_only()
+        current_hhmm = current_time[:5]
+        if current_hhmm >= auto_unlock:
+            update_system_lock(0, locked_by=None)
+            increment_data_version()
+            return True, None
+    return False, "⛔ ប្រព័ន្ធកំពុងបិទការចូលធ្វើការ! សូមរង់ចាំរហូតដល់ម៉ោងបើកដោយស្វ័យប្រវត្តិ ឬទាក់ទង Admin!"
+
+# ============================================================
+# ATTENDANCE SETTINGS FUNCTIONS
+# ============================================================
+
+def get_attendance_setting(user_id):
+    """Get attendance setting for user"""
+    try:
+        return attendance_settings_collection.find_one({'user_id': str(user_id)})
+    except Exception as e:
+        print(f"Error in get_attendance_setting: {e}")
+        return None
+
+def save_attendance_setting(user_id, check_in_deadline, is_active):
+    """Save attendance setting"""
+    try:
+        attendance_settings_collection.update_one(
+            {'user_id': str(user_id)},
+            {'$set': {
+                'check_in_deadline': check_in_deadline,
+                'is_active': is_active,
+                'updated_at': get_current_datetime_str()
+            }},
+            upsert=True
+        )
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in save_attendance_setting: {e}")
+        return False
+
+def get_all_attendance_settings():
+    """Get all attendance settings"""
+    try:
+        return list(attendance_settings_collection.find({}))
+    except Exception as e:
+        print(f"Error in get_all_attendance_settings: {e}")
+        return []
+
+def check_attendance_deadline(user_id):
+    """Check if user can check in based on deadline"""
+    setting = get_attendance_setting(user_id)
+    if not setting:
+        return True, None
+    if setting.get('is_active') != 1:
+        return True, None
+    deadline = setting.get('check_in_deadline')
+    if not deadline:
+        return True, None
+    current_time = get_current_time_only()
+    current_hhmm = current_time[:5]
+    if current_hhmm > deadline:
+        return False, deadline
+    return True, deadline
+
 # ============================================================
 # LEAVE FUNCTIONS
 # ============================================================
 
 def create_leave(user_id, start_date, end_date, days, reason='', attachment=None):
+    """Create leave request"""
     try:
         leaves_collection.insert_one({
             'user_id': str(user_id),
@@ -661,6 +842,7 @@ def create_leave(user_id, start_date, end_date, days, reason='', attachment=None
         return False
 
 def get_pending_leaves():
+    """Get pending leave requests"""
     try:
         return list(leaves_collection.find({'status': 'pending'}).sort('created_at', -1))
     except Exception as e:
@@ -668,6 +850,7 @@ def get_pending_leaves():
         return []
 
 def approve_leave(leave_id, admin_id):
+    """Approve leave request"""
     try:
         if isinstance(leave_id, str):
             leave_id = ObjectId(leave_id)
@@ -685,6 +868,7 @@ def approve_leave(leave_id, admin_id):
         return False
 
 def reject_leave(leave_id):
+    """Reject leave request"""
     try:
         if isinstance(leave_id, str):
             leave_id = ObjectId(leave_id)
@@ -703,6 +887,7 @@ def reject_leave(leave_id):
 # ============================================================
 
 def create_mission(user_id, start_date, end_date, days, destination='', purpose='', attachment=None):
+    """Create mission request"""
     try:
         missions_collection.insert_one({
             'user_id': str(user_id),
@@ -723,6 +908,7 @@ def create_mission(user_id, start_date, end_date, days, destination='', purpose=
         return False
 
 def get_pending_missions():
+    """Get pending mission requests"""
     try:
         return list(missions_collection.find({'status': 'pending'}).sort('created_at', -1))
     except Exception as e:
@@ -730,6 +916,7 @@ def get_pending_missions():
         return []
 
 def approve_mission(mission_id, admin_id):
+    """Approve mission request"""
     try:
         if isinstance(mission_id, str):
             mission_id = ObjectId(mission_id)
@@ -747,6 +934,7 @@ def approve_mission(mission_id, admin_id):
         return False
 
 def reject_mission(mission_id):
+    """Reject mission request"""
     try:
         if isinstance(mission_id, str):
             mission_id = ObjectId(mission_id)
@@ -761,93 +949,11 @@ def reject_mission(mission_id):
         return False
 
 # ============================================================
-# ATTENDANCE SETTINGS
+# ATTENDANCE MANAGEMENT FUNCTIONS
 # ============================================================
-
-def get_attendance_setting(user_id):
-    try:
-        return attendance_settings_collection.find_one({'user_id': str(user_id)})
-    except Exception as e:
-        print(f"Error in get_attendance_setting: {e}")
-        return None
-
-def save_attendance_setting(user_id, check_in_deadline, is_active):
-    try:
-        attendance_settings_collection.update_one(
-            {'user_id': str(user_id)},
-            {'$set': {
-                'check_in_deadline': check_in_deadline,
-                'is_active': is_active,
-                'updated_at': get_current_datetime_str()
-            }},
-            upsert=True
-        )
-        increment_data_version()
-        return True
-    except Exception as e:
-        print(f"Error in save_attendance_setting: {e}")
-        return False
-
-def get_all_attendance_settings():
-    try:
-        return list(attendance_settings_collection.find({}))
-    except Exception as e:
-        print(f"Error in get_all_attendance_settings: {e}")
-        return []
-
-# ============================================================
-# CLEAN DATA
-# ============================================================
-
-def clean_all_data():
-    try:
-        attendance_collection.delete_many({})
-        leaves_collection.delete_many({})
-        missions_collection.delete_many({})
-        increment_data_version()
-        return True
-    except Exception as e:
-        print(f"Error in clean_all_data: {e}")
-        return False
-
-def clean_attendance_only():
-    try:
-        attendance_collection.delete_many({})
-        increment_data_version()
-        return True
-    except Exception as e:
-        print(f"Error in clean_attendance_only: {e}")
-        return False
-
-def clean_leaves_only():
-    try:
-        leaves_collection.delete_many({})
-        increment_data_version()
-        return True
-    except Exception as e:
-        print(f"Error in clean_leaves_only: {e}")
-        return False
-
-def clean_missions_only():
-    try:
-        missions_collection.delete_many({})
-        increment_data_version()
-        return True
-    except Exception as e:
-        print(f"Error in clean_missions_only: {e}")
-        return False
-
-def get_attendance_report(start_date, end_date):
-    try:
-        daily = list(attendance_collection.find({
-            'date': {'$gte': start_date, '$lte': end_date}
-        }).sort('date', -1))
-        return {'daily': daily, 'summary': []}
-    except Exception as e:
-        print(f"Error in get_attendance_report: {e}")
-        return {'daily': [], 'summary': []}
 
 def get_attendance_by_id(attendance_id):
+    """Get attendance record by ID"""
     try:
         if isinstance(attendance_id, str):
             attendance_id = ObjectId(attendance_id)
@@ -857,6 +963,7 @@ def get_attendance_by_id(attendance_id):
         return None
 
 def update_attendance(attendance_id, check_in=None, check_out=None, date=None, shift=None):
+    """Update attendance record"""
     try:
         if isinstance(attendance_id, str):
             attendance_id = ObjectId(attendance_id)
@@ -870,7 +977,6 @@ def update_attendance(attendance_id, check_in=None, check_out=None, date=None, s
         if shift:
             update_data['shift'] = shift
         if check_in and check_out:
-            from datetime import datetime
             check_in_dt = datetime.strptime(check_in, '%Y-%m-%d %H:%M:%S')
             check_out_dt = datetime.strptime(check_out, '%Y-%m-%d %H:%M:%S')
             total_hours = (check_out_dt - check_in_dt).total_seconds() / 3600
@@ -887,6 +993,7 @@ def update_attendance(attendance_id, check_in=None, check_out=None, date=None, s
         return False
 
 def delete_attendance(attendance_id):
+    """Delete attendance record"""
     try:
         if isinstance(attendance_id, str):
             attendance_id = ObjectId(attendance_id)
@@ -895,4 +1002,61 @@ def delete_attendance(attendance_id):
         return True
     except Exception as e:
         print(f"Error in delete_attendance: {e}")
+        return False
+
+def get_attendance_report(start_date, end_date):
+    """Get attendance report"""
+    try:
+        daily = list(attendance_collection.find({
+            'date': {'$gte': start_date, '$lte': end_date}
+        }).sort('date', -1))
+        return {'daily': daily, 'summary': []}
+    except Exception as e:
+        print(f"Error in get_attendance_report: {e}")
+        return {'daily': [], 'summary': []}
+
+# ============================================================
+# CLEAN DATA FUNCTIONS
+# ============================================================
+
+def clean_all_data():
+    """Delete all data (attendance, leaves, missions) but keep users"""
+    try:
+        attendance_collection.delete_many({})
+        leaves_collection.delete_many({})
+        missions_collection.delete_many({})
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in clean_all_data: {e}")
+        return False
+
+def clean_attendance_only():
+    """Delete only attendance data"""
+    try:
+        attendance_collection.delete_many({})
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in clean_attendance_only: {e}")
+        return False
+
+def clean_leaves_only():
+    """Delete only leaves data"""
+    try:
+        leaves_collection.delete_many({})
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in clean_leaves_only: {e}")
+        return False
+
+def clean_missions_only():
+    """Delete only missions data"""
+    try:
+        missions_collection.delete_many({})
+        increment_data_version()
+        return True
+    except Exception as e:
+        print(f"Error in clean_missions_only: {e}")
         return False
