@@ -6642,8 +6642,18 @@ REPORT_HTML = '''<!DOCTYPE html>
 # MAIN
 # ============================================================
 
-# បន្ថែមនៅចុងបញ្ចប់នៃ flask_app.py
+import os
+import sys
+
+# ហៅ init_db នៅពេល app ចាប់ផ្តើម
+with app.app_context():
+    try:
+        init_db()
+        print("✅ Database initialized successfully!")
+    except Exception as e:
+        print(f"❌ Database initialization error: {e}")
+        sys.exit(1)
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
