@@ -144,20 +144,7 @@ def init_db():
             })
             print("✅ Created admin user: admin / 1234")
 
-        # Check if test user exists
-        test_user = users_collection.find_one({'username': 'user1'})
-        if not test_user:
-            users_collection.insert_one({
-                'username': 'user1',
-                'password': '1234',
-                'full_name': 'បុគ្គលិកសាកល្បង',
-                'email': '',
-                'phone': '',
-                'role': 'user',
-                'created_at': get_current_datetime_str()
-            })
-            print("✅ Created test user: user1 / 1234")
-
+       
         # Check if data version exists
         version = data_version_collection.find_one({'_id': 'version'})
         if not version:
